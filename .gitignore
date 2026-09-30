@@ -6,6 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
+#JavaScript Libraries
+node_modules/
+
+#API keys / passwords
+.env
+
+#Junk file
+.Ds_Store
+
 # Distribution / packaging
 .Python
 build/
