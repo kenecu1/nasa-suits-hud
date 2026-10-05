@@ -20,10 +20,12 @@ if __name__ == "__main__":
         try:
             sock.sendto(request, server_address)
             reply = sock.recv(9999)
+            data = json.loads(reply.decode(errors='replace'))
+            o2_val = data['telemetry']['oxy_pri_storage']
+            print(f"Primary O2 Storage: {o2_val:.2f}%\n")
         except OSError:
             print("Connection lost. Check if the server is still running.")
-        else:
-            data = json.loads(reply.decode(errors='replace'))
-            print(f"Primary O2 Storage: {data['telemetry']['oxy_pri_storage']:.2f}%\n")
-        
+        except (ValueError, TypeError, KeyError):
+            print("Bad data format from TSS - can't extract Primary O2 level")
+
         time.sleep(1)
