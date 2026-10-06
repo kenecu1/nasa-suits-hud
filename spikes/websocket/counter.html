@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebSocket counter demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #111; color: #eee; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    #value { font-size: 96px; font-weight: 700; margin: 10px 0; font-variant-numeric: tabular-nums; }
+    #status { padding: 6px 12px; border-radius: 6px; display: inline-block; background: #333; }
+    #status.connected { background: #1d6b3c; }
+    #status.disconnected { background: #8a2a2d; }
+    #log { margin-top: 20px; padding: 12px; background: #222; border-radius: 6px; font-family: monospace; font-size: 13px; height: 160px; overflow-y: auto; white-space: pre-wrap; }
+    label { display: block; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h2>WebSocket counter demo</h2>
+  <p>The Python server pushes a number once per second. This page never asks for it.</p>
+
+  <div id="status" class="disconnected">Disconnected</div>
+  <div id="value">--</div>
+
+  <label>
+    <input type="checkbox" id="reconnect">
+    Auto-reconnect (try again every 2 seconds after the connection drops)
+  </label>
+
+  <div id="log"></div>
+
+  <script>
+    // Where the Python server listens. Must match the host and port in counter_server.py.
+    const SERVER_URL = "ws://localhost:8765";
+
+    const statusBox = document.getElementById("status");
+    const valueBox = document.getElementById("value");
+    const logBox = document.getElementById("log");
+
+    function log(text) {
+      const time = new Date().toLocaleTimeString();
+      logBox.textContent += `[${time}] ${text}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function connect() {
+      log("Connecting to " + SERVER_URL + " ...");
+      const ws = new WebSocket(SERVER_URL);
+
+      // Runs once, when the connection is established.
+      ws.onopen = () => {
+        statusBox.textContent = "Connected";
+        statusBox.className = "connected";
+        log("Connected.");
+      };
+
+      // Runs every time the server pushes a message.
+      ws.onmessage = (event) => {
+        valueBox.textContent = event.data;
+      };
+
+      // Runs when the connection ends, for any reason (server stopped, network lost).
+      ws.onclose = () => {
+        statusBox.textContent = "Disconnected";
+        statusBox.className = "disconnected";
+        log("Connection closed.");
+
+        // A browser never reconnects a WebSocket by itself. The page has to do it.
+        if (document.getElementById("reconnect").checked) {
+          log("Will retry in 2 seconds.");
+          setTimeout(connect, 2000);
+        }
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>

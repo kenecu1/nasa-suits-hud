@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CORS test: can a page read the TSS directly?</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #111; color: #eee; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    input { padding: 8px; width: 220px; font-size: 16px; }
+    button { padding: 8px 14px; font-size: 16px; cursor: pointer; }
+    #result { margin-top: 20px; padding: 14px; border-radius: 6px; background: #222; white-space: pre-wrap; }
+    .ok { border-left: 5px solid #28ae5f; }
+    .fail { border-left: 5px solid #e5484d; }
+  </style>
+</head>
+<body>
+  <h2>CORS test</h2>
+  <p>Question: can a web page that is NOT served by the TSS read the TSS's JSON over HTTP?</p>
+
+  <!-- Type the IP that ./server.exe printed, without the port -->
+  <input id="ip" placeholder="TSS IP, e.g. 172.22.251.151">
+  <button onclick="runTest()">Fetch EVA.json</button>
+
+  <div id="result">Not run yet.</div>
+
+  <script>
+    async function runTest() {
+      const ip = document.getElementById("ip").value.trim();
+      const box = document.getElementById("result");
+      const url = `http://${ip}:14141/data/instances/0/EVA.json`;
+      box.className = "";
+      box.textContent = "Asking " + url + " ...";
+
+      try {
+        // Same request the browser makes when you open the URL in a tab,
+        // but this time it is made BY A PAGE, so the browser's CORS rule applies.
+        const response = await fetch(url);
+        const data = await response.json();
+
+        box.className = "ok";
+        box.textContent =
+          "WORKED: the page was allowed to read the TSS.\n\n" +
+          "Primary O2: " + data.telemetry.oxy_pri_storage + " %";
+      } catch (error) {
+        box.className = "fail";
+        box.textContent =
+          "BLOCKED or FAILED: the page could not read the TSS.\n\n" +
+          "Error: " + error.message + "\n\n" +
+          "Press F12, open the Console tab, and read the red message.\n" +
+          "If it mentions 'CORS' or 'Access-Control-Allow-Origin', the browser blocked it.\n" +
+          "If it says connection refused or timed out, the TSS is not running or the IP is wrong.";
+      }
+    }
+  </script>
+</body>
+</html>
