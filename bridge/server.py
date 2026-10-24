@@ -20,9 +20,6 @@ log = logging.getLogger("bridge")
 clients = set()
 
 def save_reply(file, data):
-    # TODO: write ONE line to the file: a JSON object with "t" (time.time())
-    #       and "eva" (the data), then a newline. Then flush the file,
-    #       so nothing is lost if the server is killed.
     record = {"t": time.time(), "eva": data}
     file.write(json.dumps(record) + "\n")
     file.flush()
