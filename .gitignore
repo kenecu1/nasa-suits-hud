@@ -230,3 +230,4 @@ __marimo__/
 
 bridge/config.json
 
+data/recordings/run-*.jsonl
