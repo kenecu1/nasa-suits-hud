@@ -40,4 +40,4 @@ src/
 Panels never set their own position. Layout decides where things go.
 
 ## Design
-See [docs/layout.md](docs/layout.md) for the layout decisions and reasons.
+See [docs/hud-layout.md](../docs/hud-layout.md) for the layout decisions and reasons.
