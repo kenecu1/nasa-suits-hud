@@ -1,12 +1,13 @@
 import asyncio
-from fastapi import WebSocket, FastAPI, WebSocketDisconnect
 import json
-from contextlib import asynccontextmanager
-from tss_client import poll_once, load_config
 import logging
 import socket
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from tss_client import load_config, poll_once
 
 RECORDINGS_DIR = Path(__file__).parent.parent / "data" / "recordings"
 
