@@ -1,6 +1,6 @@
 import {useState, useEffect} from "react";
 
-function O2Box({label, value}) {
+function O2Box({label, value}: {label : string; value: number}) {
   return <p>{label}: {value}%</p>;
 }
 
