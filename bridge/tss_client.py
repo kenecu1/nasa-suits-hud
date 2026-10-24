@@ -1,9 +1,9 @@
-import socket
-import time
 import json
-import sys
-from pathlib import Path
 import logging
+import socket
+import sys
+import time
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
