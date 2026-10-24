@@ -23,34 +23,44 @@ async def broadcast(text):
         except Exception:
             clients.discard(ws)
 
+def telemetry_message(payload):
+    return {
+        "type": "telemetry",
+        "version": 1,
+        "timestamp": time.time(),
+        "data": payload,
+    }
+
+def error_message(reason, last_time):
+    return {
+        "type": "tss_error",
+        "version": 1,
+        "timestamp": time.time(),
+        "reason": reason,
+        "age": round(time.time()-last_time, 1) if last_time else None
+    }
+
 async def poll_loop(sock, server_address):
-    last_data = None
     last_time = None
-    connected = False
 
     while True:
         try:
             data = await asyncio.to_thread(poll_once, sock, server_address)
-            data['telemetry']['oxy_pri_storage']
+            payload = {"telemetry": data['telemetry'],
+                       "status": data['status'],
+                       "error": data['error']}
         except OSError as e:
-
-            connected = False
             log.warning("Connection lost: {}".format(e))
+            message = error_message("unreachable", last_time)
         except (ValueError, TypeError, KeyError) as e:
-            connected = False
             log.warning(f"Bad data format from TSS: {e!r}")
+            message = error_message("bad_data", last_time)
         else:
             # only when the poll worked AND data looks correct
-            last_data = data
             last_time = time.time()
-            connected = True
         
-        message = {
-            "version": 1,
-            "tss_connected": connected,
-            "age_seconds": None if last_time is None else int(time.time() - last_time),
-            "eva": last_data
-        }
+            message = telemetry_message(payload)
+
         await broadcast(json.dumps(message))
         await asyncio.sleep(1)
 
