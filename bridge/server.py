@@ -6,6 +6,9 @@ from tss_client import poll_once, load_config
 import logging
 import socket
 import time
+from pathlib import Path
+
+RECORDINGS_DIR = Path(__file__).parent.parent / "data" / "recordings"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,6 +18,11 @@ logging.basicConfig(
 log = logging.getLogger("bridge")
 
 clients = set()
+
+def save_reply(file, data):
+    record = {"t": time.time(), "eva": data}
+    file.write(json.dumps(record) + "\n")
+    file.flush()
 
 async def broadcast(text):
     for ws in list(clients):
@@ -40,15 +48,24 @@ def error_message(reason, last_time):
         "age": round(time.time()-last_time, 1) if last_time else None
     }
 
-async def poll_loop(sock, server_address):
+def replay_replies(path):
+    while True:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                yield json.loads(line)["eva"]
+
+async def poll_loop(sock, server_address, rec_file, replay):
     last_time = None
 
     while True:
         try:
-            data = await asyncio.to_thread(poll_once, sock, server_address)
+            if replay is not None:
+                data = next(replay)
+            else:
+                data = await asyncio.to_thread(poll_once, sock, server_address)
             payload = {"telemetry": data['telemetry'],
-                       "status": data['status'],
-                       "error": data['error']}
+                    "status": data['status'],
+                    "error": data['error']}
         except OSError as e:
             log.warning("Connection lost: {}".format(e))
             message = error_message("unreachable", last_time)
@@ -58,7 +75,8 @@ async def poll_loop(sock, server_address):
         else:
             # only when the poll worked AND data looks correct
             last_time = time.time()
-        
+            if rec_file:
+                save_reply(rec_file, data)
             message = telemetry_message(payload)
 
         await broadcast(json.dumps(message))
@@ -73,10 +91,25 @@ async def lifespan(app):
     sock.bind(('0.0.0.0', 0))
     sock.settimeout(config['timeout_seconds'])   # time out after n secs of not receiving data
 
-    task = asyncio.create_task(poll_loop(sock, server_address))   # starts once, when the server starts
+    rec_file = None
+    if config.get("mode", "live") == "record":
+        RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+        name = "run-" + time.strftime("%Y%m%d-%H%M%S") + ".jsonl"
+        rec_file = open(RECORDINGS_DIR/name, "a", encoding="utf-8")
+        log.info(f"Recording to {name}")
+
+    replay = None
+    if config.get("mode", "live") == "replay":
+        path = Path(__file__).parent.parent / config["recording_file"]
+        replay = replay_replies(path)
+        log.info(f"Replaying {path.name}")
+
+    task = asyncio.create_task(poll_loop(sock, server_address, rec_file, replay))   # starts once, when the server starts
     yield
     task.cancel()                    # stops when the server stops
     sock.close()
+    if rec_file:
+        rec_file.close()
 
 app = FastAPI(lifespan=lifespan)
 
