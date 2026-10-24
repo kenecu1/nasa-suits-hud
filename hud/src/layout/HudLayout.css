@@ -20,6 +20,6 @@
 .area-vitals  { grid-area: vitals; }
 
 .panel {
-  border: 1px dashed #555;
+  border: 1px dashed var(--border);
   padding: 8px;
 }
