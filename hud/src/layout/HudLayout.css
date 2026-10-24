@@ -1,0 +1,25 @@
+.hud {
+  display: grid;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 16px;
+  gap: 16px;
+  grid-template-columns: 1fr 2fr 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "battery  warning  map"
+    "heart    center   tracker"
+    ".        center   vitals";
+}
+
+.area-battery { grid-area: battery; }
+.area-warning { grid-area: warning; }
+.area-map     { grid-area: map; }
+.area-tracker { grid-area: tracker; }
+.area-heart   { grid-area: heart; }
+.area-vitals  { grid-area: vitals; }
+
+.panel {
+  border: 1px dashed var(--border);
+  padding: 8px;
+}

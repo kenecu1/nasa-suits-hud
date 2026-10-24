@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
-createRoot(document.getElementById('root')).render(
+const rootE1 = document.getElementById('root');
+if (!rootE1) throw new Error("HUD failed to start: #root not foundin index.html");
+createRoot(rootE1).render(
   <StrictMode>
     <App />
   </StrictMode>,
