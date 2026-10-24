@@ -44,3 +44,18 @@ If the TSS stops answering:
 
 - A reply that can't be read (bad JSON, missing field) also counts as `connected=False`.
 - No installs needed, only Python's built-in libraries.
+
+## server.py
+
+Runs the bridge. It polls the TSS once per second and pushes each reading to the HUD over a WebSocket. The message format is in [docs/contracts/telemetry.md](../docs/contracts/telemetry.md).
+
+**Run it:**
+1. One-time install: `python -m pip install -r bridge/requirements.txt`
+2. Start the TSS and set up `bridge/config.json` (see above).
+3. From the repo root:
+```
+   cd bridge
+   python -m uvicorn server:app --reload --port 8000
+```
+
+The HUD connects to `ws://localhost:8000/ws`. Several pages can connect at once. If the TSS is off, the bridge keeps sending messages with `tss_connected: false`.
