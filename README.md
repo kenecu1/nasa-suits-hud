@@ -6,6 +6,7 @@
 
 <p align="center">
   <em>A spacesuit heads up display for a simulated lunar EVA</em><br><br>
+  <a href="https://github.com/kenecu1/nasa-suits-hud/actions/workflows/ci.yml"><img src="https://github.com/kenecu1/nasa-suits-hud/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/status-in%20progress-F2A900?style=for-the-badge">
 </p>
 
