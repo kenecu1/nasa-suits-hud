@@ -27,3 +27,4 @@
 .banner-nominal { color: var(--nominal); }
 .banner-caution { color: var(--caution); }
 .banner-warning { color: var(--warning); border-color: var(--warning); }
+.stale { opacity: 0.4; }

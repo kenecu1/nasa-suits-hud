@@ -9,9 +9,11 @@ import { useTelemetry } from '../telemetry/useTelemetry';
 
 function HudLayout() {
   const { telemetry, started, lastError, bridgeOffline, versionMismatch } = useTelemetry();
+  const stale = bridgeOffline || lastError !== null;
+
   return (
     <div className="hud">
-      <div className="area-battery"><BatteryPanel telemetry={telemetry} /></div>
+      <div className="area-battery"><BatteryPanel telemetry={telemetry} stale={stale}/></div>
       <div className="area-warning">
         <WarningBanner
           started={started}
@@ -22,8 +24,8 @@ function HudLayout() {
       </div>
       <div className="area-map"><MapPanel /></div>
       <div className="area-tracker"><MissionTracker /></div>
-      <div className="area-heart"><HeartRatePanel telemetry = {telemetry} /></div>
-      <div className="area-vitals"><VitalsPanel telemetry={telemetry} /></div>
+      <div className="area-heart"><HeartRatePanel telemetry = {telemetry} stale={stale}/></div>
+      <div className="area-vitals"><VitalsPanel telemetry={telemetry} stale={stale}/></div>
     </div>
   );
 }
