@@ -23,3 +23,7 @@
   border: 1px dashed var(--border);
   padding: 8px;
 }
+
+.banner-nominal { color: var(--nominal); }
+.banner-caution { color: var(--caution); }
+.banner-warning { color: var(--warning); border-color: var(--warning); }
