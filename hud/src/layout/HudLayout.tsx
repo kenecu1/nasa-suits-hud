@@ -5,6 +5,7 @@ import MapPanel from '../panels/MapPanel';
 import MissionTracker from '../panels/MissionTracker';
 import HeartRatePanel from '../panels/HeartRatePanel';
 import VitalsPanel from '../panels/VitalsPanel';
+import SuitDetailsPanel from '../panels/SuitDetailsPanel';
 import { useTelemetry } from '../telemetry/useTelemetry';
 
 function HudLayout() {
@@ -23,6 +24,7 @@ function HudLayout() {
          />
       </div>
       <div className="area-map"><MapPanel /></div>
+      <div className="area-details"><SuitDetailsPanel telemetry={telemetry} stale={stale} /></div>
       <div className="area-tracker"><MissionTracker /></div>
       <div className="area-heart"><HeartRatePanel telemetry = {telemetry} stale={stale}/></div>
       <div className="area-vitals"><VitalsPanel telemetry={telemetry} stale={stale}/></div>
