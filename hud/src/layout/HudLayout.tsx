@@ -11,11 +11,11 @@ function HudLayout() {
   const { telemetry } = useTelemetry();
   return (
     <div className="hud">
-      <div className="area-battery"><BatteryPanel /></div>
+      <div className="area-battery"><BatteryPanel telemetry={telemetry} /></div>
       <div className="area-warning"><WarningBanner /></div>
       <div className="area-map"><MapPanel /></div>
       <div className="area-tracker"><MissionTracker /></div>
-      <div className="area-heart"><HeartRatePanel /></div>
+      <div className="area-heart"><HeartRatePanel telemetry = {telemetry} /></div>
       <div className="area-vitals"><VitalsPanel telemetry={telemetry} /></div>
     </div>
   );
