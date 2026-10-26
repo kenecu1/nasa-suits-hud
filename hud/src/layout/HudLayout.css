@@ -9,7 +9,7 @@
   grid-template-areas:
     "battery  warning  map"
     "heart    center   tracker"
-    ".        center   vitals";
+    "details  center   vitals";
 }
 
 .area-battery { grid-area: battery; }
@@ -22,4 +22,25 @@
 .panel {
   border: 1px dashed var(--border);
   padding: 8px;
+}
+
+.banner-nominal { color: var(--nominal); }
+.banner-caution { color: var(--caution); }
+.banner-warning { color: var(--warning); border-color: var(--warning); }
+.stale { opacity: 0.4; }
+
+.area-details { grid-area: details; align-self: end; }
+
+.details-toggle {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.details-table td {
+  padding: 2px 12px 2px 0;
+  color: var(--text-dim);
 }
