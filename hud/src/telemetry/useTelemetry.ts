@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { BridgeMessage, SuitTelemetry, TSSErrorMessage } from './types';
+import type { BridgeMessage, SuitErrors, SuitTelemetry, TSSErrorMessage } from './types';
 import { makeMockTelemetry } from './mockTelemetry';
 import {config} from "../config";
 
 export type TelemetryState = {
   telemetry: SuitTelemetry | null;    // last good values, null until the first one arrives
   started: boolean;                   // EVA started?
+  errors: SuitErrors | null;          // suit fault flags, null until the first good message
   lastError: TSSErrorMessage | null;  // most recent tss_error, cleared by good data
   lastReceivedAt: number | null; // HUD clock (ms) when the last message arrived
   versionMismatch: boolean;     
@@ -14,6 +15,7 @@ export type TelemetryState = {
 const initialState: TelemetryState = {
   telemetry: null,
   started: false,
+  errors: null,
   lastError: null,
   lastReceivedAt: null,
   versionMismatch: false,
@@ -42,6 +44,7 @@ export function useTelemetry(): TelemetryState & { bridgeOffline: boolean } {
         setState({
           telemetry: msg.data.telemetry,
           started: msg.data.status.started,
+          errors: msg.data.error,
           lastError: null,
           lastReceivedAt: receivedAt,
           versionMismatch: false,

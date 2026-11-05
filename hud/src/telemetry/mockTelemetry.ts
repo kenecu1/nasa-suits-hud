@@ -2,6 +2,18 @@ import type { TelemetryMessage } from './types';
 
 const START_TIME = Date.now();
 
+// Reads ?faults=fan,oxy from the address bar and turns those flags on
+function faultsFromUrl() {
+  const text = new URLSearchParams(window.location.search).get('faults') ?? '';
+  const names = text.split(',');
+  return {
+    fan_error: names.includes('fan'),
+    oxy_error: names.includes('oxy'),
+    power_error: names.includes('power'),
+    scrubber_error: names.includes('scrubber'),
+  };
+}
+
 // adds small random noise so values look live
 function jitter(value: number, amount: number): number {
   return value + (Math.random() - 0.5) * amount;
@@ -42,12 +54,7 @@ export function makeMockTelemetry(): TelemetryMessage {
         eva_elapsed_time: Math.floor(elapsed),
       },
       status: { started: true },
-      error: {
-        fan_error: false,
-        oxy_error: false,
-        power_error: false,
-        scrubber_error: false,
-      },
+      error: faultsFromUrl(),
     },
   };
 }
