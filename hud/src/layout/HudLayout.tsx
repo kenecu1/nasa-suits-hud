@@ -9,7 +9,7 @@ import SuitDetailsPanel from '../panels/SuitDetailsPanel';
 import { useTelemetry } from '../telemetry/useTelemetry';
 
 function HudLayout() {
-  const { telemetry, started, lastError, bridgeOffline, versionMismatch } = useTelemetry();
+  const { telemetry, started, errors, lastError, bridgeOffline, versionMismatch } = useTelemetry();
   const stale = bridgeOffline || lastError !== null;
 
   return (
@@ -18,6 +18,7 @@ function HudLayout() {
       <div className="area-warning">
         <WarningBanner
           started={started}
+          errors={errors}
           lastError={lastError}
           bridgeOffline={bridgeOffline}
           versionMismatch={versionMismatch}
