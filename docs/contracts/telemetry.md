@@ -1,6 +1,6 @@
 # Telemetry Message Contract (Bridge to HUD)
 
-**Ticket:** SUITS-20
+**Ticket:** SUITS-20 (`levels`, `dcu` and `uia` added in SUITS-31)
 **Version:** 1
 
 ## 1. Purpose
@@ -46,7 +46,7 @@ Every message has these top level fields.
 
 ## 4. Data fields (v1)
 
-`data` contains three groups: `telemetry`, `status`, and `error`. All other TSS groups (`dcu`, `uia`, `imu`, `ssu`, `spec`) are out of scope for v1 and will be added in later versions.
+`data` contains six groups: `telemetry`, `status`, `error`, `levels`, `dcu` and `uia`. The other TSS groups (`imu`, `ssu`, `spec`) are out of scope for v1 and will be added in later versions.
 
 ### 4a. `data.telemetry`
 
@@ -95,6 +95,33 @@ Suit hardware fault flags. These are **not** connection errors (those use `tss_e
 
 Normal ranges for caution and warning live in NASA's `documents/telemetry_ranges/eva-telemetry-ranges.pdf` and in `docs/tss-notes.md`. They are intentionally not part of this contract.
 
+### 4d. `data.levels`
+
+The bridge checks every value against its normal range and sends one label per value. The HUD only shows the label. It never decides what is "bad".
+
+| Label | Meaning |
+|---|---|
+| `nominal` | Fine |
+| `caution` | Still in range, but close to a limit |
+| `warning` | Outside the normal range |
+| `unknown` | The value was missing or not a number |
+
+`levels` has one entry for every value in `data.telemetry` that has a range (all except `eva_elapsed_time`), using the same field name, for example `"heart_rate": "caution"`.
+
+How a label is chosen:
+* The limits come from NASA's ranges PDF and live in one file: `bridge/ranges.json`. To change a limit, change it only there.
+* **Warning** means outside the min or max, on an edge that matters. Some values only matter on one side (an O2 tank is only bad when too low, a CO2 scrubber only when too high).
+* **Caution** means inside the range, but within 10% of the range width from an edge that matters.
+* **EVA not started:** every label is `nominal`, because values read 0 before the EVA starts.
+
+### 4e. `data.dcu`
+
+The switches on the suit, passed through from the TSS. All true/false: `oxy`, `fan`, `pump`, `co2`, and `batt.lu`, `batt.ps` (inside `batt`). What `true` means for each switch is in `docs/tss-notes.md`.
+
+### 4f. `data.uia`
+
+The switches on the wall panel, passed through from the TSS. All true/false: `eva1_power`, `eva1_oxy`, `eva1_water_supply`, `eva1_water_waste`, the same four for `eva2`, plus `oxy_vent` and `depress`. `true` means ON/OPEN.
+
 ## 5. Example messages
 
 ### 5a. Telemetry (EVA running)
@@ -138,10 +165,37 @@ Normal ranges for caution and warning live in NASA's `documents/telemetry_ranges
       "oxy_error": false,
       "power_error": false,
       "scrubber_error": false
+    },
+    "levels": {
+      "primary_battery_level": "nominal",
+      "oxy_pri_storage": "nominal",
+      "heart_rate": "caution",
+      "scrubber_a_co2_storage": "nominal"
+    },
+    "dcu": {
+      "oxy": true,
+      "fan": true,
+      "pump": true,
+      "co2": true,
+      "batt": { "lu": true, "ps": true }
+    },
+    "uia": {
+      "eva1_power": true,
+      "eva1_oxy": true,
+      "eva1_water_supply": true,
+      "eva1_water_waste": false,
+      "eva2_power": false,
+      "eva2_oxy": false,
+      "eva2_water_supply": false,
+      "eva2_water_waste": false,
+      "oxy_vent": false,
+      "depress": true
     }
   }
 }
 ```
+
+The `levels`, `dcu` and `uia` groups are shortened or sample values here. The real `levels` has one entry per value with a range (see 4d).
 
 ### 5b. Error (TSS unreachable)
 
@@ -192,6 +246,10 @@ Normal ranges for caution and warning live in NASA's `documents/telemetry_ranges
 | Nesting | TSS groups under `data` | Keeps envelope fields separate from TSS data. Error messages simply have no `data` |
 | Versioning | Adding fields keeps the version. Renaming, removing, or moving fields bumps it | New groups are ignored by older HUD code; breaking changes must fail loudly |
 | Error types | One `tss_error` type with `reason` | The HUD responds the same way to both failures; only the warning text differs. Mirrors the bridge's two `except` blocks |
+| Version for SUITS-31 | Stays at 1 | `levels`, `dcu` and `uia` are only additions. Nothing was renamed or removed |
+| Who decides caution and warning | The bridge | The HUD only displays labels. A threshold change touches `bridge/ranges.json` only |
+| Caution zone | 10% of the range width, on the edges that matter | NASA's PDF gives only a min and max. Edges that matter follow the PDF's notes |
+| EVA not started | All labels `nominal` | Values read 0 before the EVA starts, which would trigger false alarms |
 
 ## 8. Notes
 

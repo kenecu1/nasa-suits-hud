@@ -7,8 +7,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from tss_client import load_config, poll_once
 from levels import classify_all, load_ranges
+from tss_client import load_config, poll_once
 
 RECORDINGS_DIR = Path(__file__).parent.parent / "data" / "recordings"
 

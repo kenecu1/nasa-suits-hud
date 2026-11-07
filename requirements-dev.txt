@@ -1,2 +1,3 @@
 pytest
 ruff
+-r bridge/requirements.txt
