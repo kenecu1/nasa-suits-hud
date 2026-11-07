@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from tss_client import load_config, poll_once
+from levels import classify_all, load_ranges
 
 RECORDINGS_DIR = Path(__file__).parent.parent / "data" / "recordings"
 
@@ -55,7 +56,7 @@ def replay_replies(path):
             for line in f:
                 yield json.loads(line)["eva"]
 
-async def poll_loop(sock, server_address, rec_file, replay):
+async def poll_loop(sock, server_address, rec_file, replay, ranges):
     last_time = None
 
     while True:
@@ -66,7 +67,10 @@ async def poll_loop(sock, server_address, rec_file, replay):
                 data = await asyncio.to_thread(poll_once, sock, server_address)
             payload = {"telemetry": data['telemetry'],
                     "status": data['status'],
-                    "error": data['error']}
+                    "error": data['error'],
+                    "levels": classify_all(data['telemetry'], data['status']['started'], ranges),
+                    "dcu": data['dcu'],
+                    "uia": data['uia']}
         except OSError as e:
             log.warning("Connection lost: {}".format(e))
             message = error_message("unreachable", last_time)
@@ -85,6 +89,7 @@ async def poll_loop(sock, server_address, rec_file, replay):
 
 @asynccontextmanager
 async def lifespan(app):
+    ranges = load_ranges()
     config = load_config()
     server_address = (config["tss_ip"], 14142 + config['tss_team'])
 
@@ -105,7 +110,7 @@ async def lifespan(app):
         replay = replay_replies(path)
         log.info(f"Replaying {path.name}")
 
-    task = asyncio.create_task(poll_loop(sock, server_address, rec_file, replay))   # starts once, when the server starts
+    task = asyncio.create_task(poll_loop(sock, server_address, rec_file, replay, ranges))   # starts once, when the server starts
     yield
     task.cancel()                    # stops when the server stops
     sock.close()
