@@ -34,6 +34,17 @@ Keep it to about two printed pages. Use plain words and short sentences. Diagram
 10. **Predict before you read the code.** Write 4–5 questions that make them reason about the design, not recall names. Examples: "Link drops for 3 s: what does every panel show and why?" or "Where would you add a new alert, and which files would you not touch?" Put each answer in a `<details><summary>Answer</summary>…</details>` block.
 11. **Decisions taken.** Leave this section empty under the heading. It is filled after the discussion.
 
+## Interactive companion: `docs/briefs/M<n>-explorer.html`
+
+Kenny and Vlad want as much interactivity as possible. After the brief, build one self-contained HTML page (no build step, no external data) and publish it as an Artifact. Link it at the top of the brief. Use `docs/briefs/M1-explorer.html` as the pattern: tabs, real data from the notes and `data/`, and plain words. Pick 5–8 instruments that fit this milestone, for example:
+- a clickable system map with lenses (what changes, what is pure, what runs in the headset)
+- an event stepper: a sequence diagram revealed one message at a time, showing the real payloads and "if this hop is built badly"
+- a simulator of the milestone's core logic, such as alert hysteresis (M2), a procedure state machine (M3), bearing and route geometry (M4), forecast intervals (M5), or the guardrail check on spoken numbers (M6)
+- a failure simulator: break inputs and watch what each layer notices
+- self-checks: a "where does this job live?" drill, "which files change if…", and the prediction questions with written answers kept in browser storage
+
+Label every simulation as a model of the design, not the real code. Commit the page with the brief.
+
 ## After writing
 
 1. In chat, give a short summary and the link. Ask them to read the diagrams first and try the prediction questions before opening the answers.
