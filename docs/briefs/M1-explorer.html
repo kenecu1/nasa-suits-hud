@@ -1,0 +1,958 @@
+<title>M1 Skeleton Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: mission-console workbench. Sticky tab rail; each tab is one instrument with its explanation beside it. */
+:root{
+  --bg:#eef1f5; --panel:#ffffff; --sunk:#e4e9f0; --ink:#15202c; --muted:#566476; --line:#cdd6e0;
+  --accent:#2a56c6; --accent-soft:#dde5fb;
+  --nom:#1d7f55; --cau:#9a5f0c; --warn:#c42d2d; --stale:#737d8a;
+  --c-ts:#2a56c6; --c-len:#7a4cc2; --c-dev:#0f7f8a; --c-code:#9a5f0c; --c-data:#1d7f55; --c-ck:#c42d2d;
+  --hud-bg:#0c131c; --hud-line:#2a3a4c; --hud-ink:#e8eef5; --hud-dim:#8796a8;
+  --hud-nom:#4fd18f; --hud-cau:#f0b84a; --hud-warn:#ff6b6b; --hud-stale:#9aa6b4;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141b; --panel:#161f29; --sunk:#1d2834; --ink:#e4eaf1; --muted:#93a1b1; --line:#2b3746;
+  --accent:#7fa2ff; --accent-soft:#1f2c4a;
+  --nom:#4cc68c; --cau:#e9b04b; --warn:#ff7070; --stale:#8d98a5;
+  --c-ts:#7fa2ff; --c-len:#b48cf0; --c-dev:#4cc3cc; --c-code:#e9b04b; --c-data:#4cc68c; --c-ck:#ff7070;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141b; --panel:#161f29; --sunk:#1d2834; --ink:#e4eaf1; --muted:#93a1b1; --line:#2b3746;
+  --accent:#7fa2ff; --accent-soft:#1f2c4a;
+  --nom:#4cc68c; --cau:#e9b04b; --warn:#ff7070; --stale:#8d98a5;
+  --c-ts:#7fa2ff; --c-len:#b48cf0; --c-dev:#4cc3cc; --c-code:#e9b04b; --c-data:#4cc68c; --c-ck:#ff7070;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{padding-block:28px 14px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(30px,5vw,44px);line-height:1.05;margin:6px 0 8px;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:600;font-size:26px;margin:0 0 6px;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:19px;margin:0 0 6px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{color:var(--muted);max-width:72ch}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-block:1px solid var(--line)}
+nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:6px}
+nav.tabs a{flex:none;font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:.02em;color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:6px}
+nav.tabs a:hover{color:var(--ink);background:var(--sunk)}
+nav.tabs a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+nav.tabs a .n{font-family:var(--f-mono);font-size:11px;opacity:.7;margin-right:6px}
+main{padding-block:22px 60px}
+section.view{display:grid;gap:18px}
+.intro{display:grid;gap:4px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.scroll{overflow-x:auto}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn,select,input[type=text]{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 12px}
+button{cursor:pointer;font-weight:500}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+pre{background:var(--sunk);border-radius:8px;padding:10px 12px;margin:8px 0 0;overflow-x:auto;font-family:var(--f-mono);font-size:12.5px;line-height:1.5}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:var(--sunk);color:var(--muted)}
+.tag.m1{background:var(--accent-soft);color:var(--accent)}
+.note{border-left:3px solid var(--accent);padding:6px 12px;background:var(--accent-soft);border-radius:0 6px 6px 0;font-size:14px}
+.note.warn{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+/* map */
+svg text{fill:var(--ink);font-family:var(--f-body)}
+.node{cursor:pointer}
+.node rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.node.m1 rect{stroke:var(--accent)}
+.node.ext rect{fill:var(--sunk)}
+.node.later rect{stroke-dasharray:5 4;fill:transparent}
+.node.later text{fill:var(--muted)}
+.node .t1{font-family:var(--f-display);font-weight:600;font-size:16px}
+.node .t2{font-size:11px;fill:var(--muted);font-family:var(--f-mono)}
+.node:hover rect{stroke-width:2.5}
+.node.sel rect{stroke:var(--accent);stroke-width:3;fill:var(--accent-soft)}
+.node.dim{opacity:.22}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.6}
+.edge.later,.edge.alt{stroke-dasharray:5 4}
+.edge.dim{opacity:.12}
+.edge.hot{stroke:var(--accent);stroke-width:2.6}
+.grp{fill:none;stroke:var(--line);stroke-dasharray:2 5}
+.grpl{font-family:var(--f-mono)!important;font-size:11px;fill:var(--muted)!important;letter-spacing:.08em}
+.pulse{fill:var(--accent)}
+/* flow */
+.lane{stroke:var(--line);stroke-width:1.2;stroke-dasharray:3 4}
+.lanehead rect{fill:var(--sunk);stroke:var(--line)}
+.lanehead text{font-family:var(--f-display);font-weight:600;font-size:13.5px}
+.msg line,.msg path{stroke:var(--muted);stroke-width:1.5;fill:none}
+.msg text{font-size:11.5px;fill:var(--muted)}
+.msg.cur line,.msg.cur path{stroke:var(--accent);stroke-width:2.6}
+.msg.cur text{fill:var(--accent);font-weight:600}
+.msg.fail line,.msg.fail path{stroke:var(--warn)}
+.msg.fail text{fill:var(--warn)}
+.stepno{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+/* packets */
+.bytes{display:flex;flex-wrap:wrap;gap:4px}
+.byte{font-family:var(--f-mono);font-size:14px;width:38px;padding:6px 0;text-align:center;border-radius:5px;border:1px solid transparent;cursor:pointer;color:var(--ink)}
+.byte small{display:block;font-size:9.5px;color:var(--muted)}
+.byte.changed{outline:2px dashed var(--warn)}
+.f-ts{background:color-mix(in srgb,var(--c-ts) 18%,transparent);border-color:color-mix(in srgb,var(--c-ts) 45%,transparent)}
+.f-len{background:color-mix(in srgb,var(--c-len) 18%,transparent);border-color:color-mix(in srgb,var(--c-len) 45%,transparent)}
+.f-dev{background:color-mix(in srgb,var(--c-dev) 18%,transparent);border-color:color-mix(in srgb,var(--c-dev) 45%,transparent)}
+.f-code{background:color-mix(in srgb,var(--c-code) 18%,transparent);border-color:color-mix(in srgb,var(--c-code) 45%,transparent)}
+.f-data{background:color-mix(in srgb,var(--c-data) 18%,transparent);border-color:color-mix(in srgb,var(--c-data) 45%,transparent)}
+.f-ck{background:color-mix(in srgb,var(--c-ck) 18%,transparent);border-color:color-mix(in srgb,var(--c-ck) 45%,transparent)}
+.f-junk{background:var(--sunk);border-color:var(--line);color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12.5px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.verdict{font-weight:600}
+.ok{color:var(--nom)} .bad{color:var(--warn)}
+table.t{border-collapse:collapse;width:100%;font-size:13.5px}
+table.t th,table.t td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+table.t td.num{font-variant-numeric:tabular-nums;font-family:var(--f-mono)}
+td.mismatch{color:var(--warn);font-weight:600;background:color-mix(in srgb,var(--warn) 9%,transparent)}
+/* HUD mock */
+.hud{background:var(--hud-bg);color:var(--hud-ink);border:1px solid var(--hud-line);border-radius:12px;padding:14px 16px;font-family:var(--f-display);min-width:0}
+.hud .lab{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--hud-dim)}
+.hud .big{font-size:38px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.hud .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-display);font-weight:700;letter-spacing:.08em;font-size:13px;padding:3px 9px;border-radius:5px;border:1.5px solid currentColor}
+.lv-nominal{color:var(--hud-nom)} .lv-caution{color:var(--hud-cau)} .lv-warning{color:var(--hud-warn)} .lv-unknown,.lv-stale{color:var(--hud-stale)}
+.lv-stale{border-style:dashed}
+.chip{font-family:var(--f-mono);font-size:12px;padding:3px 8px;border-radius:999px;border:1px solid currentColor}
+/* levels bar */
+.zone-n{fill:color-mix(in srgb,var(--nom) 26%,transparent)}
+.zone-c{fill:color-mix(in srgb,var(--cau) 30%,transparent)}
+.zone-w{fill:color-mix(in srgb,var(--warn) 24%,transparent)}
+.zone-x{fill:var(--sunk)}
+.tick{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+/* link timeline */
+.tl rect{shape-rendering:crispEdges}
+.log{font-family:var(--f-mono);font-size:12px;max-height:190px;overflow:auto;background:var(--sunk);border-radius:8px;padding:8px 10px}
+.log div{padding:1px 0}
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:860px){.cols3{grid-template-columns:minmax(0,1fr)}}
+.big-state{font-family:var(--f-display);font-weight:700;font-size:22px}
+/* rig */
+.rig svg{width:100%;max-width:440px;height:auto;display:block;margin:0 auto}
+.fov{fill:color-mix(in srgb,var(--accent) 14%,transparent);stroke:var(--accent);stroke-width:1}
+.ring{fill:none;stroke:var(--line);stroke-dasharray:3 5}
+.panelseg{stroke:var(--warn);stroke-width:7;stroke-linecap:round}
+.panelseg.in{stroke:var(--nom)}
+.head{fill:var(--panel);stroke:var(--ink);stroke-width:2}
+/* quiz */
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) 210px 28px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+@media (max-width:620px){.qrow{grid-template-columns:minmax(0,1fr) 28px}.qrow select{grid-column:1}}
+.qexp{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.files label{border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--f-mono);font-size:13px;display:flex;gap:7px;align-items:center}
+.files label.right{border-color:var(--nom);color:var(--nom)}
+.files label.wrong{border-color:var(--warn);color:var(--warn)}
+textarea{width:100%;min-height:70px;font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:8px}
+.pq{display:grid;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
+.ans{background:var(--sunk);border-radius:8px;padding:10px 12px;font-size:14px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="top wrap">
+  <div class="eyebrow">NASA SUITS HUD · milestone 1 · before building</div>
+  <h1>M1 walking skeleton, hands on</h1>
+  <p class="lede">An interactive companion to <code>docs/briefs/M1.md</code>. Nothing here is the real code. Each tab is a small model of how M1 is <em>designed</em> to work, so you can poke at it before a builder writes it. The packet tab uses the real captured packets from <code>docs/notes/tss-packet-format.md</code>, and the levels tab uses the real <code>ranges.json</code>.</p>
+</header>
+
+<nav class="tabs" aria-label="Sections"><div class="wrap" id="tabbar"></div></nav>
+
+<main class="wrap">
+
+<!-- MAP -->
+<section class="view" id="v-map" hidden>
+  <div class="intro">
+    <h2>The system map</h2>
+    <p class="muted">Click any box to see its files, its job, and what it must never do. Use the lenses to see the design rules as groups of boxes.</p>
+  </div>
+  <div class="card">
+    <div class="controls" id="lenses" style="margin-bottom:10px"></div>
+    <div class="note small" id="lensCaption">Showing everything. Solid blue outline = built in M1. Dashed = later milestones.</div>
+    <div class="scroll" style="margin-top:10px"><svg id="mapSvg" viewBox="0 0 1120 520" style="min-width:820px;width:100%;height:auto" role="img" aria-label="System map"></svg></div>
+    <div class="controls" style="margin-top:8px"><button id="pulseBtn" class="primary">▶ Send one reading through</button><span class="muted small">Animates a telemetry value from the TSS to the panel.</span></div>
+  </div>
+  <div class="card" id="nodeInfo"></div>
+</section>
+
+<!-- FLOW -->
+<section class="view" id="v-flow" hidden>
+  <div class="intro">
+    <h2>Step through an event</h2>
+    <p class="muted">A sequence diagram you reveal one message at a time. Pick a scenario, then step. Each step shows the actual bytes or JSON on that arrow and what goes wrong if that hop is built badly.</p>
+  </div>
+  <div class="card">
+    <div class="controls" id="scenarioBtns"></div>
+    <div class="scroll" style="margin-top:10px"><svg id="flowSvg" style="min-width:900px;width:100%;height:auto" role="img" aria-label="Sequence diagram"></svg></div>
+    <div class="controls" style="margin-top:6px">
+      <button id="flowPrev">◀ Back</button><button id="flowNext" class="primary">Next ▶</button><button id="flowPlay">Play all</button><button id="flowReset">Restart</button>
+      <span class="stepno" id="flowCount"></span>
+    </div>
+  </div>
+  <div class="card" id="flowInfo"></div>
+</section>
+
+<!-- PACKETS -->
+<section class="view" id="v-packets" hidden>
+  <div class="intro">
+    <h2>Packet lab</h2>
+    <p class="muted">The new TSS protocol is binary: a 10-byte header, the data, then a 1-byte checksum. This is what <code>tss/codec.py</code> will do. Click any byte to corrupt it and watch the codec reject the packet.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="controls"><select id="pktSel" aria-label="Captured packet"></select><button id="pktReset">Reset bytes</button></div>
+      <div class="controls" style="margin-top:8px"><input type="text" id="pktHex" aria-label="Packet hex" style="flex:1;min-width:0;font-family:var(--f-mono)" spellcheck="false"><button id="pktLoad">Decode hex</button></div>
+      <div class="legend" style="margin:12px 0 8px">
+        <span><i class="f-ts"></i>timestamp</span><span><i class="f-len"></i>length</span><span><i class="f-dev"></i>device</span><span><i class="f-code"></i>code</span><span><i class="f-data"></i>data</span><span><i class="f-junk"></i>ignored</span><span><i class="f-ck"></i>checksum</span>
+      </div>
+      <div class="bytes" id="pktBytes"></div>
+      <div id="pktVerdict" style="margin-top:12px"></div>
+      <details style="margin-top:10px"><summary class="small">Show the checksum worked out byte by byte</summary><pre id="xorWork"></pre></details>
+    </div>
+    <div class="card">
+      <h3>Decoded</h3>
+      <dl class="kv" id="pktDecoded"></dl>
+      <div id="pktPayload" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Build a Subscribe packet</h3>
+    <p class="muted small">Acceptance test 1: subscribing to DCU with timestamp <code>0x6af55d2c</code> must give exactly <code>6af55d2c000d000f00010001ec</code>.</p>
+    <div class="controls"><label class="small" for="bDev">Device</label><select id="bDev"><option value="1">1 DCU</option><option value="2">2 UIA</option><option value="3">3 SPM</option><option value="4">4 SSU</option></select>
+      <label class="small" for="bTs">Timestamp (hex)</label><input type="text" id="bTs" value="6af55d2c" style="width:120px;font-family:var(--f-mono)"></div>
+    <pre id="bOut"></pre>
+  </div>
+</section>
+
+<!-- LEVELS -->
+<section class="view" id="v-levels" hidden>
+  <div class="intro">
+    <h2>Levels playground</h2>
+    <p class="muted">How a number becomes nominal, caution or warning. The backend decides the level (<code>core/levels.py</code> with <code>data/ranges.json</code>). The client only picks a look for it (<code>theme.ts</code> through the view model).</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="controls"><select id="lvSel" aria-label="Telemetry value"></select></div>
+      <svg id="lvBar" viewBox="0 0 640 90" style="width:100%;height:auto;margin-top:12px" role="img" aria-label="Range bar"></svg>
+      <input type="range" id="lvSlider" aria-label="Value">
+      <div class="controls" style="margin-top:8px">
+        <label class="chk"><input type="checkbox" id="lvStarted" checked> EVA started</label>
+        <label class="chk"><input type="checkbox" id="lvStale"> link lost (data is old)</label>
+        <label class="chk"><input type="checkbox" id="lvMissing"> value missing</label>
+      </div>
+      <p class="small muted" style="margin-top:10px" id="lvRule"></p>
+    </div>
+    <div class="card" style="display:grid;gap:12px">
+      <div><div class="eyebrow">Backend sends (in state.suit.values)</div><pre id="lvJson"></pre></div>
+      <div><div class="eyebrow">View model makes</div><pre id="lvVm"></pre></div>
+      <div class="hud"><div class="lab" id="lvHudLab">value</div><div class="row" style="margin-top:6px"><div class="big" id="lvHudVal">–</div><span id="lvHudBadge"></span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- LINK -->
+<section class="view" id="v-link" hidden>
+  <div class="intro">
+    <h2>Link and reconnect simulator</h2>
+    <p class="muted">Break things and watch what each part notices. The TSS can go silent or refuse your IP. The backend can die. The HUD must always tell the truth about how fresh its data is.</p>
+  </div>
+  <div class="card">
+    <div class="controls">
+      <button id="lkTss">TSS: on</button><button id="lkAssign">Laptop IP: assigned</button><button id="lkBackend">Backend: running</button>
+      <label class="chk"><input type="checkbox" id="lkPaths"> show per-path status (open decision A)</label>
+      <button id="lkReset">Reset</button>
+    </div>
+    <div class="cols3" style="margin-top:14px">
+      <div><div class="eyebrow">TSS</div><div class="big-state" id="lkTssState"></div><div class="small muted" id="lkTssSub"></div></div>
+      <div><div class="eyebrow">Backend · state.link</div><div class="big-state" id="lkLink"></div><div class="small mono" id="lkAge"></div><div class="small mono" id="lkPathsOut"></div></div>
+      <div><div class="eyebrow">Client socket</div><div class="big-state" id="lkSock"></div><div class="small muted" id="lkRetry"></div></div>
+    </div>
+    <svg id="lkTl" class="tl" viewBox="0 0 600 46" style="width:100%;height:auto;margin-top:12px" role="img" aria-label="Link timeline"></svg>
+    <div class="legend small"><span><i style="background:var(--nom)"></i>ok</span><span><i style="background:var(--cau)"></i>unassigned</span><span><i style="background:var(--warn)"></i>unreachable</span><span><i style="background:var(--stale)"></i>HUD offline (no socket)</span><span class="muted">last 40 s</span></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Event log</h3><div class="log" id="lkLog"></div></div>
+    <div class="card"><div class="eyebrow" style="margin-bottom:6px">What the wearer sees</div>
+      <div class="hud" id="lkHud"></div>
+      <p class="small muted" style="margin-top:10px">Oxygen % comes over the legacy JSON path. The switch comes over the new binary path. They can fail separately.</p></div>
+  </div>
+</section>
+
+<!-- STATE -->
+<section class="view" id="v-state" hidden>
+  <div class="intro">
+    <h2>Full state vs deltas</h2>
+    <p class="muted">The backend sends the <em>whole</em> state each time. Here two clients watch the same stream: one gets full state, one gets only what changed. Turn up message loss and see which one drifts away from the truth.</p>
+  </div>
+  <div class="card">
+    <div class="controls">
+      <button id="stRun" class="primary">Pause</button>
+      <label class="small" for="stLoss">Message loss</label><input type="range" id="stLoss" min="0" max="50" value="15" style="width:160px"><span class="mono small" id="stLossOut">15%</span>
+      <button id="stJoin">Headset joins late</button><button id="stReset">Reset</button>
+    </div>
+    <div class="scroll" style="margin-top:12px"><table class="t" id="stTable" style="min-width:560px"></table></div>
+    <p class="small muted" id="stStats" style="margin-top:8px"></p>
+  </div>
+  <div class="note">With full state, a lost message costs at most one second of staleness, because the next one carries everything. With deltas, a lost change stays wrong until that field changes again. A late joiner never learns fields that don't change. The price of full state is size, and at a few KB once a second that is nothing.</div>
+</section>
+
+<!-- RIG -->
+<section class="view" id="v-rig" hidden>
+  <div class="intro">
+    <h2>The head-following rig</h2>
+    <p class="muted">Seen from above. The wedge is what the wearer can see. The bar is the HUD panel, 1.2 m away. Turn the head and compare three ways a panel can behave. M1 builds the lazy follow.</p>
+  </div>
+  <div class="grid2">
+    <div class="card rig">
+      <svg id="rigSvg" viewBox="-200 -200 400 400" role="img" aria-label="Top-down view of head and panel"></svg>
+      <input type="range" id="rigYaw" min="-180" max="180" value="0" aria-label="Head direction">
+      <div class="controls" style="justify-content:center;margin-top:6px"><button id="rigL">⟲ Turn 90° left</button><button id="rigR">Turn 90° right ⟳</button><button id="rigJit">Small head jitter</button></div>
+    </div>
+    <div class="card" style="display:grid;gap:12px">
+      <div class="controls" id="rigModes"></div>
+      <p id="rigDesc" class="small"></p>
+      <dl class="kv"><dt>Head</dt><dd class="mono" id="rigHead"></dd><dt>Panel</dt><dd class="mono" id="rigPanel"></dd><dt>Panel in view?</dt><dd id="rigIn"></dd></dl>
+      <div><button id="rigTest">Run acceptance test 14</button><div id="rigTestOut" class="small" style="margin-top:6px"></div></div>
+      <p class="small muted">The rig only turns around the vertical axis and never tilts, so looking down at the ground doesn't drag the HUD into the ground.</p>
+    </div>
+  </div>
+</section>
+
+<!-- QUIZ -->
+<section class="view" id="v-quiz" hidden>
+  <div class="intro">
+    <h2>Check yourself</h2>
+    <p class="muted">Three drills. Your written answers stay in this browser only.</p>
+  </div>
+  <div class="card">
+    <h3>1 · Where does this job live?</h3>
+    <div id="q1"></div>
+    <div class="controls" style="margin-top:10px"><button id="q1Check" class="primary">Check</button><span id="q1Score" class="verdict"></span></div>
+  </div>
+  <div class="card">
+    <h3>2 · NASA moves suit telemetry to the binary protocol. Tick every file that has to change.</h3>
+    <div class="files" id="q2" style="margin-top:8px"></div>
+    <div class="controls" style="margin-top:10px"><button id="q2Check" class="primary">Check</button><span id="q2Score" class="verdict"></span></div>
+    <p class="small muted" id="q2Exp" hidden>Only the adapter, the fake that imitates the TSS, and the recordings know the wire format. Everything after <code>TssSnapshot</code> stays the same. That is the whole point of the adapter, and acceptance test 7 enforces it.</p>
+  </div>
+  <div class="card">
+    <h3>3 · Predict before you read the code</h3>
+    <p class="small muted">The questions from section 10 of the brief. Write your answer first, then reveal.</p>
+    <div id="q3"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+function s(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs = {}, html) { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+/* ---------- tabs ---------- */
+const TABS = [['map', 'System map'], ['flow', 'Event stepper'], ['packets', 'Packet lab'], ['levels', 'Levels'], ['link', 'Link & reconnect'], ['state', 'Full state vs deltas'], ['rig', 'Head rig'], ['quiz', 'Check yourself']];
+const bar = $('#tabbar');
+TABS.forEach(([id, label], i) => { const a = h('a', { href: '#' + id }, `<span class="n">${i + 1}</span>${label}`); a.dataset.id = id; bar.appendChild(a); });
+let current = null;
+function show() {
+  let id = location.hash.slice(1); if (!TABS.some(t => t[0] === id)) id = 'map';
+  TABS.forEach(([t]) => { $('#v-' + t).hidden = t !== id; });
+  bar.querySelectorAll('a').forEach(a => { if (a.dataset.id === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  current = id;
+  if (id === 'rig') rigLoopStart();
+}
+window.addEventListener('hashchange', show);
+
+/* ---------- codec helpers (mirror of what tss/codec.py will do) ---------- */
+const hexToBytes = t => { t = t.replace(/[^0-9a-f]/gi, ''); if (t.length % 2) t = t.slice(0, -1); const a = []; for (let i = 0; i < t.length; i += 2) a.push(parseInt(t.substr(i, 2), 16)); return a; };
+const hx = (n, w = 2) => n.toString(16).padStart(w, '0');
+const toHex = b => b.map(x => hx(x)).join('');
+const xor = b => b.reduce((a, x) => a ^ x, 0);
+const u16 = (b, i) => (b[i] << 8) | b[i + 1];
+const u32 = (b, i) => ((b[i] << 24) >>> 0) + (b[i + 1] << 16) + (b[i + 2] << 8) + b[i + 3];
+function build(ts, dev, code, data) {
+  const len = 10 + data.length + 1;
+  const b = [(ts >>> 24) & 255, (ts >>> 16) & 255, (ts >>> 8) & 255, ts & 255, len >> 8, len & 255, dev >> 8, dev & 255, code >> 8, code & 255, ...data];
+  b.push(xor(b)); return b;
+}
+const DEVICES = { 1: 'DCU', 2: 'UIA', 3: 'SPM', 4: 'SSU', 5: 'CTS', 6: 'XRF', 15: 'team device (us)' };
+const CODES = { 1: 'Subscribe', 2: 'Unsubscribe', 3: 'Telemetry', 4: 'Ack' };
+const ACKS = { 0: 'ok', 1: 'team not assigned → link.tss = "unassigned"', 2: 'bad device or length' };
+const DCU_MAP = [['batt', 'UMB', 'LOCAL'], ['oxy', 'PRI', 'SEC'], ['comm', 'A', 'B'], ['fan', 'PRI', 'SEC'], ['pump', 'OPEN', 'CLOSED'], ['co2', 'A', 'B']];
+const UIA_MAP = [['eva_power', 'ON', 'OFF'], ['water_supply', 'OPEN', 'CLOSED'], ['water_waste', 'OPEN', 'CLOSED'], ['o2_supply', 'OPEN', 'CLOSED'], ['o2_vent', 'OPEN', 'CLOSED'], ['depress', 'OPEN', 'CLOSED']];
+const PAYLOAD_MIN = { 1: 6, 2: 6, 3: 28, 4: 33 };
+function decode(b) {
+  if (b.length < 11) return { error: 'PacketTooShort', why: `Only ${b.length} bytes. A packet needs at least 11 (10 header + 1 checksum).` };
+  const len = u16(b, 4);
+  if (len !== b.length) return { error: 'LengthMismatch', why: `The length field says ${len} bytes but the datagram has ${b.length}.` };
+  const calc = xor(b.slice(0, -1)), got = b[b.length - 1];
+  if (calc !== got) return { error: 'BadChecksum', why: `XOR of the first ${b.length - 1} bytes is 0x${hx(calc)}, but the last byte says 0x${hx(got)}.` };
+  return { ts: u32(b, 0), len, dev: u16(b, 6), code: u16(b, 8), data: b.slice(10, -1), ck: got };
+}
+
+/* ---------- 1. MAP ---------- */
+const NODES = {
+  tss: { x: 20, y: 160, label: 'NASA TSS', sub: 'real server, WSL', cls: 'ext', title: 'NASA TSS (Telemetry Stream Server)', files: ['vendor/TSS2027 (NASA code, run in WSL)'], does: 'Simulates the suit, the DCU and UIA switches and the rover. It speaks two dialects: binary on UDP 14141 (DCU, UIA, SPM, SSU) and legacy JSON on per-team ports 14142 + team (telemetry, status, faults, position).', never: 'Is contacted by the headset. Only the backend talks to it, because browsers cannot send UDP and the TSS identifies one client by IP.', tests: ['16 (manual smoke)'] },
+  fake: { x: 20, y: 300, label: 'Fake TSS', sub: 'sim/fake_tss.py', cls: 'm1', title: 'Fake TSS', files: ['backend/suits/sim/fake_tss.py'], does: 'A localhost UDP server that answers both dialects with values tests can change. On purpose it can drop the first Subscribe, answer Ack 1, go silent or send bad JSON.', never: 'Runs in live mode. It stands in for the TSS in sim mode and in tests.', tests: ['4', '5', '9'] },
+  sub: { x: 215, y: 80, label: 'Subscription + codec', sub: 'tss/ · binary · 14141', cls: 'm1', title: 'Subscription + codec', files: ['backend/suits/tss/subscription.py', 'backend/suits/tss/codec.py'], does: '<b>codec</b> builds and parses binary packets (10-byte header, data, XOR checksum) and checks length and checksum. <b>subscription</b> subscribes to DCU and UIA, resends until an Ack arrives, and reports <code>unassigned</code> on Ack 1.', never: 'Decides what a flag means (that is mapping), or crashes on a bad packet. It raises a typed error and the receive loop carries on.', tests: ['1', '2', '3', '4'] },
+  leg: { x: 215, y: 240, label: 'Legacy poller', sub: 'tss/ · JSON · 14142+team', cls: 'm1', title: 'Legacy poller', files: ['backend/suits/tss/legacy.py'], does: 'Once a second, sends 8-byte requests for commands 1 (telemetry), 2 (status) and 4 (faults) to port 14142 + team, and reads the JSON reply.', never: 'Uses command 0, the whole-file request NASA removed on 2026-10-19 (your current bridge uses it), or sends legacy requests to port 14141.', tests: ['5'] },
+  rec: { x: 215, y: 400, label: 'Recorder', sub: 'tss/recorder.py', cls: 'm1', title: 'Recorder and replayer', files: ['backend/suits/tss/recorder.py', 'data/recordings/*.jsonl'], does: 'Writes every raw datagram with its direction and time, one JSON object per line. Replay pushes those bytes through the same decoder as live data.', never: 'Records decoded values. Then a decoder bug would be invisible in replay.', tests: ['6'] },
+  map: { x: 405, y: 160, label: 'Mapping', sub: 'raw → TssSnapshot', cls: 'm1', title: 'Mapping', files: ['backend/suits/tss/mapping.py'], does: 'Merges both dialects into one <code>TssSnapshot</code>. Holds the single table that turns raw flags into named positions (oxy flag 1 → "PRI").', never: 'Lets a raw flag or a TSS field layout leak past it.', tests: ['7', '9'] },
+  core: { x: 590, y: 160, label: 'Store + levels', sub: 'core/ → State', cls: 'm1', title: 'Store + levels', files: ['backend/suits/core/store.py', 'backend/suits/core/levels.py', 'data/ranges.json'], does: 'Keeps the latest snapshot, works out link status and age, classifies every value (nominal, caution, warning, unknown, stale) and builds <code>State</code>.', never: 'Touches a socket, or knows which dialect a value came from.', tests: ['5', '8', '9'] },
+  app: { x: 775, y: 160, label: 'app.py /ws', sub: 'full state 1 Hz + on change', cls: 'm1', title: 'Backend app', files: ['backend/suits/app.py', 'backend/suits/contract.py'], does: 'The FastAPI app. Chooses the mode (sim, replay, live), wires the pieces, serves <code>/health</code>, and pushes the full <code>State</code> on <code>/ws</code> every second and whenever it changes. <code>contract.py</code> defines every message shape, and the TypeScript types are generated from it.', never: 'Contains mission logic. It only wires things together.', tests: ['9', '10'] },
+  later: { x: 590, y: 330, label: 'alerts · procedures · nav', sub: 'ml · voice  (M2–M6)', cls: 'later', title: 'Later milestones', files: ['core/alerts.py (M2)', 'core/procedures.py (M3)', 'core/nav.py (M4)', 'ml/ (M5)', 'voice/ (M6)'], does: 'Each plugs into the store and adds fields to State.', never: 'Reads the TSS directly.', tests: [] },
+  input: { x: 775, y: 330, label: 'Input → intents', sub: 'M2', cls: 'later', title: 'Input and intents (from M2)', files: ['client/src/input/intents.ts'], does: 'Keyboard, controller and voice all become the same named intents, sent to the backend as <code>command</code> messages.', never: 'Has key or button bindings inside a component.', tests: [] },
+  theme: { x: 775, y: 440, label: 'theme.ts', sub: 'sizes · colours · levels', cls: 'm1', title: 'Theme', files: ['client/src/theme.ts'], does: 'Sizes, colours and the style of each level: colour, shape and word together.', never: 'Is bypassed with a literal colour or font size in a component.', tests: ['11'] },
+  net: { x: 960, y: 20, label: 'WebSocket client', sub: 'net/ · reconnect', cls: 'm1', title: 'WebSocket client', files: ['client/src/net/'], does: 'Connects to <code>/ws</code> on the page\'s own origin, so the headset finds the laptop with no config. Reconnects with backoff after a close.', never: 'Interprets the state. It just hands it over.', tests: ['12', '13'] },
+  store: { x: 960, y: 120, label: 'zustand store', sub: 'latest State', cls: 'm1', title: 'Client store', files: ['client/src/ (zustand store)'], does: 'Holds the latest State. Each message replaces it whole.', never: 'Merges deltas or computes levels.', tests: ['13'] },
+  vm: { x: 960, y: 220, label: 'o2.vm.ts', sub: 'State → view model', cls: 'm1', title: 'View model', files: ['client/src/hud/o2.vm.ts', 'client/src/hud/o2.vm.test.ts'], does: 'A pure function: State → { text, level, style, visible }. Every display decision lives here, so vitest can check it with no GPU.', never: 'Imports three.js or compares numbers against ranges.', tests: ['11'] },
+  scene: { x: 960, y: 330, label: 'Scene', sub: 'rig + panel, WebGL', cls: 'm1', title: 'Scene', files: ['client/src/scene/'], does: 'The head-following rig and the panel, drawn in WebGL with @react-three/uikit. The same scene runs on the laptop, in the emulated headset and on the Quest.', never: 'Computes anything. It draws the view model.', tests: ['14', '15'] },
+  hook: { x: 960, y: 440, label: 'window.__hud', sub: 'test hook', cls: 'm1', title: 'Test hook', files: ['client/src/hud/ (exposes view models)'], does: 'Exposes the current view models so Playwright can check what the HUD shows. The HUD is WebGL, so its text is not in the DOM.', never: 'Is used by the app itself.', tests: ['13', '14'] },
+};
+const NW = 150, NH = 58;
+const EDGES = [['tss', 'sub', 'both'], ['tss', 'leg', 'both'], ['fake', 'sub', 'alt'], ['fake', 'leg', 'alt'], ['sub', 'rec', 'alt'], ['leg', 'rec', 'alt'], ['sub', 'map'], ['leg', 'map'], ['map', 'core'], ['core', 'app'], ['app', 'net'], ['net', 'store'], ['store', 'vm'], ['vm', 'scene'], ['vm', 'hook', 'side'], ['theme', 'scene'], ['later', 'core', 'later'], ['input', 'app', 'later']];
+const LENSES = [
+  ['all', 'Everything', null, 'Showing everything. Solid blue outline = built in M1. Dashed = later milestones.'],
+  ['wire', 'Knows the TSS wire format', ['tss', 'fake', 'sub', 'leg', 'rec', 'map'], 'Only these know ports, packet layouts and TSS field names. Acceptance test 7 fails if anything else imports codec, subscription or legacy.'],
+  ['nasa', 'Changes if NASA changes the protocol', ['sub', 'leg', 'rec', 'map', 'fake'], 'A protocol change stops here. contract.py, core/ and the whole client stay the same, because they only ever see TssSnapshot and State.'],
+  ['pure', 'Pure logic, tested without network', ['map', 'core', 'vm', 'theme'], 'Functions you can unit test with no socket, GPU or browser: pytest for mapping and levels, vitest for view models and theme rules.'],
+  ['headset', 'Runs in the headset', ['net', 'store', 'vm', 'scene', 'hook', 'theme', 'input'], 'What runs on the Quest. It is a thin display: it formats and draws, and decides nothing about the mission.'],
+];
+const mapSvg = $('#mapSvg');
+s('defs', {}, mapSvg).innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>';
+s('rect', { class: 'grp', x: 200, y: 60, width: 740, height: 450, rx: 14 }, mapSvg);
+s('text', { class: 'grpl', x: 214, y: 54 }, mapSvg).textContent = 'BACKEND · PYTHON ON THE LAPTOP';
+s('rect', { class: 'grp', x: 950, y: 8, width: 166, height: 502, rx: 14 }, mapSvg);
+s('text', { class: 'grpl', x: 952, y: 518 }, mapSvg).textContent = 'CLIENT · BROWSER / QUEST';
+function anchor(a, b) {
+  const A = NODES[a], B = NODES[b];
+  const ax = A.x + NW / 2, ay = A.y + NH / 2, bx = B.x + NW / 2, by = B.y + NH / 2;
+  if (Math.abs(bx - ax) >= Math.abs(by - ay) * 1.2) {
+    const x1 = bx > ax ? A.x + NW : A.x, x2 = bx > ax ? B.x : B.x + NW;
+    const mx = (x1 + x2) / 2; return `M${x1},${ay} C${mx},${ay} ${mx},${by} ${x2},${by}`;
+  }
+  const y1 = by > ay ? A.y + NH : A.y, y2 = by > ay ? B.y : B.y + NH;
+  const my = (y1 + y2) / 2; return `M${ax},${y1} C${ax},${my} ${bx},${my} ${bx},${y2}`;
+}
+const edgeEls = {};
+EDGES.forEach(([a, b, kind]) => {
+  let d = anchor(a, b);
+  if (kind === 'side') { const A = NODES[a], B = NODES[b]; const x = A.x + NW; d = `M${x},${A.y + NH / 2} C${x + 34},${A.y + NH / 2} ${x + 34},${B.y + NH / 2} ${x},${B.y + NH / 2}`; }
+  const p = s('path', { d, class: 'edge' + (kind === 'alt' ? ' alt' : '') + (kind === 'later' ? ' later' : ''), 'marker-end': 'url(#arr)' }, mapSvg);
+  if (kind === 'both') p.setAttribute('marker-start', 'url(#arr)');
+  edgeEls[a + '-' + b] = p;
+});
+const nodeEls = {};
+for (const id in NODES) {
+  const n = NODES[id];
+  const g = s('g', { class: 'node ' + n.cls, tabindex: 0, role: 'button', 'aria-label': n.title }, mapSvg);
+  s('rect', { x: n.x, y: n.y, width: NW, height: NH, rx: 9 }, g);
+  s('text', { x: n.x + 12, y: n.y + 25, class: 't1' }, g).textContent = n.label;
+  s('text', { x: n.x + 12, y: n.y + 44, class: 't2' }, g).textContent = n.sub;
+  g.addEventListener('click', () => selectNode(id));
+  g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNode(id); } });
+  nodeEls[id] = g;
+}
+function selectNode(id) {
+  if (!NODES[id]) id = 'map';
+  for (const k in nodeEls) nodeEls[k].classList.toggle('sel', k === id);
+  const n = NODES[id];
+  const status = n.cls === 'later' ? '<span class="tag">later</span>' : n.cls === 'ext' ? '<span class="tag">external</span>' : '<span class="tag m1">built in M1</span>';
+  $('#nodeInfo').innerHTML = `<div class="controls" style="justify-content:space-between"><h3 style="margin:0">${n.title}</h3>${status}</div>
+  <dl class="kv" style="margin-top:10px"><dt>Files</dt><dd class="mono">${n.files.map(esc).join('<br>')}</dd>
+  <dt>Its job</dt><dd>${n.does}</dd><dt>Never</dt><dd>${n.never}</dd>
+  <dt>Proved by</dt><dd>${n.tests.length ? 'acceptance ' + n.tests.join(', ') : '—'}</dd></dl>`;
+  store.set('m1x.node', id);
+}
+const lensBox = $('#lenses');
+LENSES.forEach(([id, label, set, cap]) => {
+  const b = h('button', {}, label); b.dataset.id = id;
+  b.addEventListener('click', () => {
+    lensBox.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    for (const k in nodeEls) nodeEls[k].classList.toggle('dim', !!set && !set.includes(k));
+    for (const k in edgeEls) { const [a, c] = k.split('-'); edgeEls[k].classList.toggle('dim', !!set && !(set.includes(a) && set.includes(c))); }
+    $('#lensCaption').textContent = cap;
+  });
+  lensBox.appendChild(b);
+});
+lensBox.firstChild.classList.add('on');
+selectNode(store.get('m1x.node', 'map'));
+const PULSE_PATH = ['tss-leg', 'leg-map', 'map-core', 'core-app', 'app-net', 'net-store', 'store-vm', 'vm-scene'];
+let pulsing = false;
+$('#pulseBtn').addEventListener('click', () => {
+  if (pulsing) return; pulsing = true;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i = 0;
+  const step = () => {
+    Object.values(edgeEls).forEach(e => e.classList.remove('hot'));
+    if (i >= PULSE_PATH.length) { pulsing = false; return; }
+    const e = edgeEls[PULSE_PATH[i]]; e.classList.add('hot');
+    const c = s('circle', { r: 6, class: 'pulse' }, mapSvg);
+    const len = e.getTotalLength(), dur = reduce ? 1 : 420, t0 = performance.now();
+    const anim = now => {
+      const k = Math.min(1, (now - t0) / dur), p = e.getPointAtLength(len * k);
+      c.setAttribute('cx', p.x); c.setAttribute('cy', p.y);
+      if (k < 1) requestAnimationFrame(anim); else { c.remove(); i++; step(); }
+    };
+    requestAnimationFrame(anim);
+  };
+  step();
+});
+
+/* ---------- 2. FLOW ---------- */
+const P = ['TSS', 'legacy.py', 'subscr. + codec', 'mapping.py', 'store + levels', 'app.py /ws', 'client net', 'o2.vm.ts', 'panel'];
+const sub = toHex(build(0x6af55d2c, 15, 1, [0, 1]));
+const ack0 = toHex(build(0x6af55d33, 15, 4, [0]));
+const ack1 = toHex(build(0x6af55d33, 15, 4, [1]));
+const dcuPri = toHex(build(0x6af55d34, 1, 3, [0, 1, 0, 0, 0, 0]));
+const SCEN = {
+  o2: { name: 'Oxygen drops to 15% + switch to PRI', steps: [
+    { f: 2, t: 0, l: 'Subscribe DCU (13 bytes)', p: sub + '\n└ ts 6af55d2c · len 000d · dev 000f (us) · code 0001 Subscribe · data 0001 (DCU) · ck ec', x: 'At startup the adapter asks the TSS to push DCU switch states. UDP has no delivery guarantee, so it resends every second until it sees an Ack.', b: 'Sent once and never resent: works on localhost, where nothing is dropped, and silently fails on Wi-Fi at the real TSS. Test 4 makes the fake drop the first Subscribe.' },
+    { f: 0, t: 2, l: 'Ack 0', p: ack0 + '\n└ code 0004 Ack · data 00 = ok', x: 'The TSS accepts. From now on it pushes one DCU packet per second to the address and port we sent from, so we must receive on the same socket.', b: 'Opening a new socket to receive: replies go to the old port and nothing arrives.' },
+    { f: 1, t: 0, l: 'poll cmd 1 (8 bytes)', p: '<ts u32> 00000001   → UDP port 14142 + team', x: 'Suit telemetry still exists only on the old per-team JSON ports. Every second the legacy poller asks for command 1 (telemetry), and likewise 2 (status) and 4 (faults).', b: 'Sending command 0 like the old bridge does: NASA removed it on 2026-10-19, so the reply never comes.' },
+    { f: 0, t: 1, l: 'JSON telemetry', p: '{"telemetry": {"oxy_pri_storage": 15.0, "heart_rate": 92, ... 23 values}}', x: 'The reply is JSON text for one section. The 23 values include all 22 that have ranges, plus eva_elapsed_time.', b: 'Bad JSON crashing the loop. It must become link.tss = "bad_data" (test 5).' },
+    { f: 0, t: 2, l: 'DCU push, oxy = 1', p: dcuPri + '\n└ dev 0001 DCU · code 0003 Telemetry · data 00 01 00 00 00 00', x: 'Someone flipped the oxygen switch. Byte 1 of the DCU payload is now 1. codec checks the length and checksum before anything reads the data.', b: 'Checksum computed but never compared: corrupted packets are read as real switch changes. Test 2 sends a wrong checksum.' },
+    { f: 1, t: 3, l: 'raw telemetry dict', p: "{'oxy_pri_storage': 15.0, ...}", x: 'The legacy poller hands the raw section to mapping. It does not interpret anything.', b: '' },
+    { f: 2, t: 3, l: 'DCU flags', p: '[0, 1, 0, 0, 0, 0]', x: 'subscription hands raw flags to mapping. Still no meaning attached.', b: '' },
+    { f: 3, t: 4, l: 'TssSnapshot', p: 'TssSnapshot(\n  telemetry={"oxy_pri_storage": 15.0, ...},\n  dcu={"oxy": "PRI", "fan": "SEC", ...},\n  received_at=...)', x: 'Both dialects merge into our own model. The one flag table turns oxy 1 into "PRI". From here on nobody knows the TSS exists.', b: 'Passing raw flags onward "just for now": every later module then depends on TSS byte layouts. Test 7 checks the import boundary.' },
+    { f: 4, t: 4, l: 'levels: 15 < 20 → warning', p: 'ranges.json: oxy_pri_storage {min 20, max 100, check "low"}\n15 < 20 → "warning"', x: 'core/levels.py classifies every value. This is mission logic, so it lives in the backend and pytest tests it.', b: 'Doing this in the client: the headset, the laptop and later the voice assistant could disagree.' },
+    { f: 4, t: 5, l: 'State changed', p: 'State(v=2, seq=1042, link=…, suit=…, dcu=…)', x: 'The store builds a new State and notices it differs from the last one sent.', b: '' },
+    { f: 5, t: 6, l: 'state JSON (full)', p: '{"type":"state","v":2,"seq":1042,\n "suit":{"values":{"oxy_pri_storage":{"value":15,"unit":"%","level":"warning"}}},\n "dcu":{"oxy":"PRI", ...}, ...}', x: 'Sent at once because it changed, and again every second. Always the whole thing.', b: '' },
+    { f: 6, t: 7, l: 'store replaced', p: 'useHud.setState({ state })', x: 'The client store swaps in the new state. No merging.', b: '' },
+    { f: 7, t: 8, l: 'view model', p: '{ text: "15%", level: "warning",\n  style: theme.level.warning   // colour + shape + word\n  switch: "PRI" }', x: 'A pure function turns state into what to draw. The same object goes on window.__hud so Playwright can check it.', b: 'Putting this logic inside the 3D component: it can then only be tested with screenshots.' },
+  ] },
+  unassigned: { name: 'Laptop IP not assigned to a team', steps: [
+    { f: 2, t: 0, l: 'Subscribe DCU', p: sub, x: 'Same start as before.', b: '' },
+    { f: 0, t: 2, l: 'Ack 1 (not assigned)', p: ack1 + '\n└ data 01 = team not assigned', x: 'The TSS knows clients by IP address. Until someone assigns this laptop\'s IP to a team in the TSS web UI, it answers Ack 1 and pushes nothing.', b: 'Treating Ack 1 like a lost packet and retrying silently forever: the operator never learns what to fix.', fail: true },
+    { f: 2, t: 3, l: 'status: unassigned', p: 'subscription.status = "unassigned"', x: 'The adapter reports it as its own status (from note tss-team-must-be-assigned).', b: '' },
+    { f: 1, t: 0, l: 'poll cmd 1', p: '<ts> 00000001 → 14142 + team', x: 'The legacy path needs no assignment, so it still works.', b: '' },
+    { f: 0, t: 1, l: 'JSON telemetry', p: '{"telemetry": {"oxy_pri_storage": 87.0, ...}}', x: 'Suit values keep arriving.', b: '' },
+    { f: 1, t: 3, l: 'raw telemetry', p: "{'oxy_pri_storage': 87.0, ...}", x: '', b: '' },
+    { f: 3, t: 4, l: 'TssSnapshot (dcu missing)', p: 'TssSnapshot(telemetry={...}, dcu=None)', x: 'Half the picture: telemetry yes, switches no.', b: '' },
+    { f: 4, t: 5, l: 'State', p: '"link": {"tss": "unassigned", ...}\n"dcu": unknown', x: 'One link enum cannot say "half working". This is open decision A in the brief: add per-path detail or not.', b: '' },
+    { f: 5, t: 6, l: 'state JSON', p: '{"link":{"tss":"unassigned"}, ...}', x: '', b: '' },
+    { f: 7, t: 8, l: 'view model', p: '{ o2: "87%" nominal, switch: "—", link: "NOT ASSIGNED" }', x: 'The HUD stays honest: the value it has, unknown for the switch, and a link message that says what to fix.', b: '' },
+  ] },
+  crash: { name: 'Backend crashes and comes back', steps: [
+    { f: 5, t: 6, l: 'state JSON (last good)', p: '{"seq": 2001, "link": {"tss": "ok"}, ...}', x: 'Everything is normal.', b: '' },
+    { f: 5, t: 5, l: 'process dies', p: 'uvicorn exits (crash, Ctrl+C, laptop sleep)', x: 'The WebSocket server is gone.', b: '', fail: true },
+    { f: 6, t: 6, l: 'socket closed → offline', p: 'ws.onclose → link shown as OFFLINE', x: 'The client notices the close and immediately marks the link offline. Values turn stale-styled so nobody trusts old numbers.', b: 'Keeping the last values on screen in normal colours: the HUD looks fine while showing old data. Test 13 needs "offline" within 4 s.', fail: true },
+    { f: 6, t: 5, l: 'retry after 0.5 s', p: 'new WebSocket(origin + "/ws")  ✗', x: 'Reconnect with backoff: wait a bit, try, double the wait, up to a cap.', b: 'Reconnecting in a tight loop: hammers the laptop and floods the console.', fail: true },
+    { f: 6, t: 5, l: 'retry after 1 s', p: '✗', x: '', b: '', fail: true },
+    { f: 6, t: 5, l: 'retry after 2 s', p: '✓ connected (backend restarted)', x: 'The backend is back.', b: '' },
+    { f: 5, t: 6, l: 'full state, at once', p: '{"seq": 1, "link": {"tss": "ok"}, ... everything}', x: 'The first message after connecting is the whole state, so nothing has to catch up. This is why full state beats deltas.', b: '' },
+    { f: 6, t: 7, l: 'store replaced', p: '', x: '', b: '' },
+    { f: 7, t: 8, l: 'view model', p: '{ link: "OK", o2: "87%" nominal }', x: 'The page recovered without a reload, which is test 13.', b: '' },
+  ] },
+};
+let scen = 'o2', fi = 0, playTimer = null;
+const sbox = $('#scenarioBtns');
+for (const k in SCEN) { const b = h('button', {}, SCEN[k].name); b.dataset.k = k; b.addEventListener('click', () => { scen = k; fi = 0; stopPlay(); drawFlow(); }); sbox.appendChild(b); }
+const LW = 108, L0 = 62, Y0 = 92, GAP = 38;
+function drawFlow() {
+  sbox.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === scen));
+  const st = SCEN[scen].steps, W = L0 * 2 + LW * (P.length - 1), H = Y0 + GAP * st.length + 10;
+  const svg = $('#flowSvg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = '';
+  s('defs', {}, svg).innerHTML = '<marker id="farr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>';
+  P.forEach((name, i) => {
+    const x = L0 + i * LW;
+    s('line', { x1: x, y1: 56, x2: x, y2: H - 6, class: 'lane' }, svg);
+    const g = s('g', { class: 'lanehead' }, svg);
+    s('rect', { x: x - 50, y: 14, width: 100, height: 38, rx: 7 }, g);
+    const t = s('text', { x, y: 38, 'text-anchor': 'middle' }, g); t.textContent = name;
+  });
+  st.forEach((m, i) => {
+    if (i > fi) return;
+    const y = Y0 + i * GAP, x1 = L0 + m.f * LW, x2 = L0 + m.t * LW;
+    const g = s('g', { class: 'msg' + (i === fi ? ' cur' : '') + (m.fail ? ' fail' : '') }, svg);
+    g.style.cursor = 'pointer'; g.addEventListener('click', () => { fi = i; stopPlay(); drawFlow(); });
+    if (m.f === m.t) {
+      s('path', { d: `M${x1},${y} h34 v16 h-32`, 'marker-end': 'url(#farr)' }, g);
+      const t = s('text', { x: x1 + 40, y: y + 4 }, g); t.textContent = m.l;
+    } else {
+      const dir = x2 > x1 ? 1 : -1;
+      s('line', { x1, y1: y, x2: x2 - dir * 3, y2: y, 'marker-end': 'url(#farr)' }, g);
+      const t = s('text', { x: (x1 + x2) / 2, y: y - 6, 'text-anchor': 'middle' }, g); t.textContent = m.l;
+    }
+  });
+  const m = st[fi];
+  $('#flowCount').textContent = `step ${fi + 1} of ${st.length}`;
+  $('#flowPrev').disabled = fi === 0; $('#flowNext').disabled = fi === st.length - 1;
+  $('#flowInfo').innerHTML = `<div class="stepno">${esc(P[m.f])} → ${esc(P[m.t])}</div><h3 style="margin-top:2px">${esc(m.l)}</h3>
+    ${m.x ? `<p>${esc(m.x)}</p>` : ''}${m.p ? `<pre>${esc(m.p)}</pre>` : ''}
+    ${m.b ? `<div class="note warn" style="margin-top:10px"><b>If this hop is built badly:</b> ${esc(m.b)}</div>` : ''}`;
+}
+function stopPlay() { clearInterval(playTimer); playTimer = null; $('#flowPlay').textContent = 'Play all'; }
+$('#flowPrev').addEventListener('click', () => { stopPlay(); if (fi > 0) fi--; drawFlow(); });
+$('#flowNext').addEventListener('click', () => { stopPlay(); if (fi < SCEN[scen].steps.length - 1) fi++; drawFlow(); });
+$('#flowReset').addEventListener('click', () => { stopPlay(); fi = 0; drawFlow(); });
+$('#flowPlay').addEventListener('click', () => {
+  if (playTimer) return stopPlay();
+  if (fi >= SCEN[scen].steps.length - 1) fi = 0;
+  $('#flowPlay').textContent = 'Pause'; drawFlow();
+  playTimer = setInterval(() => { if (fi >= SCEN[scen].steps.length - 1) return stopPlay(); fi++; drawFlow(); }, 1700);
+});
+drawFlow();
+
+/* ---------- 3. PACKETS ---------- */
+const CAPTURED = [
+  ['Subscribe to DCU (we send)', '6af55d2c000d000f00010001ec'],
+  ['Ack ok', '6af55d33000c000f000400f6'],
+  ['DCU telemetry, all six flags 0', '6af55d34001100010003000000000000e5'],
+  ['UIA telemetry (6 valid + 6 garbage bytes)', '6af55d340017000200030000000000000000a0536a354c'],
+  ['SSU telemetry, idle', '6af55d34002c0004000300000000000000000000c1c800000000000000000000000000c1c8000000000000dd'],
+  ['Too short (broken on purpose)', '6af55d33000c000f04'],
+  ['UIA with only 5 payload bytes (rejected)', toHex(build(0x6af55d34, 2, 3, [0, 0, 0, 0, 0]))],
+];
+let pktOrig = [], pkt = [];
+const pktSel = $('#pktSel');
+CAPTURED.forEach(([n], i) => pktSel.appendChild(h('option', { value: i }, n)));
+function loadPkt(bytes) { pktOrig = bytes.slice(); pkt = bytes.slice(); $('#pktHex').value = toHex(bytes); renderPkt(); }
+function fieldOf(i, n, dev, code) {
+  if (i < 4) return ['f-ts', 'timestamp']; if (i < 6) return ['f-len', 'length']; if (i < 8) return ['f-dev', 'device']; if (i < 10) return ['f-code', 'code'];
+  if (i === n - 1) return ['f-ck', 'checksum'];
+  if (dev === 2 && code === 3 && i >= 16) return ['f-junk', 'uninitialised memory, ignored'];
+  return ['f-data', 'data'];
+}
+function renderPkt() {
+  const box = $('#pktBytes'); box.innerHTML = '';
+  const dev = pkt.length >= 8 ? u16(pkt, 6) : 0, code = pkt.length >= 10 ? u16(pkt, 8) : 0;
+  pkt.forEach((v, i) => {
+    const [cls, name] = fieldOf(i, pkt.length, dev, code);
+    const b = h('button', { class: 'byte ' + cls + (v !== pktOrig[i] ? ' changed' : ''), title: `byte ${i}: ${name}. Click to corrupt it.`, 'aria-label': `byte ${i} ${name} 0x${hx(v)}` }, `${hx(v)}<small>${i}</small>`);
+    b.addEventListener('click', () => { pkt[i] = (pkt[i] + 1) & 255; $('#pktHex').value = toHex(pkt); renderPkt(); });
+    box.appendChild(b);
+  });
+  const r = decode(pkt);
+  const work = []; let acc = 0;
+  pkt.slice(0, -1).forEach((v, i) => { acc ^= v; work.push(`byte ${String(i).padStart(2)}  ${hx(v)}  ${v.toString(2).padStart(8, '0')}   running XOR = ${hx(acc)}  ${acc.toString(2).padStart(8, '0')}`); });
+  if (pkt.length) work.push(`\nchecksum byte says ${hx(pkt[pkt.length - 1])} → ${acc === pkt[pkt.length - 1] ? 'match' : 'MISMATCH'}`);
+  $('#xorWork').textContent = work.join('\n');
+  const dl = $('#pktDecoded'), pl = $('#pktPayload');
+  if (r.error) {
+    $('#pktVerdict').innerHTML = `<div class="note warn"><span class="verdict bad">codec raises ${r.error}</span><br>${esc(r.why)}<br><span class="small">The receive loop logs it, counts it and keeps listening. One bad datagram must not take the link down (acceptance test 2).</span></div>`;
+    dl.innerHTML = '<dt>Result</dt><dd>rejected before anyone reads the data</dd>'; pl.innerHTML = ''; return;
+  }
+  const date = new Date(r.ts * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  $('#pktVerdict').innerHTML = `<div class="note"><span class="verdict ok">Valid packet</span>: length field matches the datagram size (${r.len} bytes) and the checksum matches (0x${hx(r.ck)}). Click a byte to break it.</div>`;
+  dl.innerHTML = `<dt>timestamp</dt><dd class="mono">0x${hx(r.ts, 8)} = ${r.ts} → ${date}</dd>
+    <dt>length</dt><dd class="mono">${r.len} bytes</dd>
+    <dt>device</dt><dd>${r.dev} · ${DEVICES[r.dev] || 'unknown'}</dd>
+    <dt>code</dt><dd>${r.code} · ${CODES[r.code] || 'unknown'}</dd>
+    <dt>data</dt><dd class="mono">${toHex(r.data) || '(none)'} · ${r.data.length} bytes</dd>`;
+  let out = '';
+  if (r.code === 4) out = `<h3>Ack</h3><p>Result <b>${r.data[0]}</b>: ${ACKS[r.data[0]] || 'unknown'}.</p>`;
+  else if (r.code === 1) out = `<h3>Subscribe</h3><p>Asks the TSS to push device ${u16(r.data, 0)} (${DEVICES[u16(r.data, 0)] || '?'}) once a second. Header device 15 means "from a team device", which is us.</p>`;
+  else if (r.code === 3 && (r.dev === 1 || r.dev === 2)) {
+    const need = PAYLOAD_MIN[r.dev], tbl = r.dev === 1 ? DCU_MAP : UIA_MAP;
+    if (r.data.length < need) out = `<div class="note warn"><b>Payload too short:</b> ${DEVICES[r.dev]} needs at least ${need} bytes, got ${r.data.length}. The decoder rejects it (acceptance test 3).</div>`;
+    else {
+      out = `<h3>${DEVICES[r.dev]} payload → named positions</h3><p class="small muted">This translation happens in <code>tss/mapping.py</code> and nowhere else.${r.dev === 2 ? ' Only the first 6 bytes are valid; the rest are uninitialised memory in the TSS and are ignored. Which raw value means OPEN or ON for UIA is the builder\'s to confirm.' : ''}</p>
+      <table class="t"><tr><th>byte</th><th>field</th><th>raw</th><th>named</th></tr>${tbl.map(([f, one, zero], i) => `<tr><td class="num">${i}</td><td class="mono">${f}</td><td class="num">${r.data[i]}</td><td><b>${r.data[i] ? one : zero}</b></td></tr>`).join('')}</table>`;
+    }
+  } else if (r.code === 3) out = `<h3>${DEVICES[r.dev] || 'Device'} payload</h3><p class="muted">${r.data.length} bytes. Not used by M1; science devices come in M7.</p>`;
+  pl.innerHTML = out;
+}
+pktSel.addEventListener('change', () => loadPkt(hexToBytes(CAPTURED[pktSel.value][1])));
+$('#pktReset').addEventListener('click', () => loadPkt(pktOrig));
+$('#pktLoad').addEventListener('click', () => loadPkt(hexToBytes($('#pktHex').value)));
+$('#pktHex').addEventListener('keydown', e => { if (e.key === 'Enter') loadPkt(hexToBytes(e.target.value)); });
+loadPkt(hexToBytes(CAPTURED[0][1]));
+function renderBuild() {
+  const ts = parseInt($('#bTs').value.replace(/[^0-9a-f]/gi, '') || '0', 16) >>> 0, dev = +$('#bDev').value;
+  const b = build(ts, 15, 1, [0, dev]), hex = toHex(b);
+  const ok = hex === '6af55d2c000d000f00010001ec';
+  $('#bOut').textContent = `${hex}\n\n${hx(ts, 8)} timestamp\n${hx(b.length, 4)} length = 13\n000f device 15 (us)\n0001 code 1 = Subscribe\n${hx(dev, 4)} data: device ${dev} (${DEVICES[dev]})\n${hx(b[12])} checksum = XOR of the 12 bytes before it` + (ok ? '\n\n✓ matches acceptance test 1 exactly' : '');
+}
+$('#bDev').addEventListener('change', renderBuild); $('#bTs').addEventListener('input', renderBuild); renderBuild();
+
+/* ---------- 4. LEVELS ---------- */
+const RANGES = { primary_battery_level: [20, 100, 'low'], secondary_battery_level: [20, 100, 'low'], oxy_pri_storage: [20, 100, 'low'], oxy_sec_storage: [20, 100, 'low'], oxy_pri_pressure: [600, 3000, 'low'], oxy_sec_pressure: [600, 3000, 'low'], coolant_storage: [80, 100, 'low'], heart_rate: [50, 160, 'both'], oxy_consumption: [0.05, 0.15, 'both'], co2_production: [0.05, 0.15, 'both'], suit_pressure_oxy: [3.5, 4.1, 'both'], suit_pressure_co2: [0, 0.1, 'high'], suit_pressure_other: [0, 0.5, 'high'], suit_pressure_total: [3.5, 4.5, 'both'], helmet_pressure_co2: [0, 0.15, 'high'], fan_pri_rpm: [29000, 31000, 'both'], fan_sec_rpm: [29000, 31000, 'both'], scrubber_a_co2_storage: [0, 60, 'high'], scrubber_b_co2_storage: [0, 60, 'high'], temperature: [10, 32, 'both'], coolant_liquid_pressure: [100, 700, 'both'], coolant_gas_pressure: [0, 700, 'high'] };
+const MARGIN = 0.10;
+const unitOf = k => /_level$|_storage$/.test(k) ? '%' : k === 'heart_rate' ? 'bpm' : /_rpm$/.test(k) ? 'rpm' : '';
+function classify(v, [mn, mx, chk]) {
+  if (typeof v !== 'number' || Number.isNaN(v)) return 'unknown';
+  const lo = chk === 'low' || chk === 'both', hi = chk === 'high' || chk === 'both', band = MARGIN * (mx - mn);
+  if ((lo && v < mn) || (hi && v > mx)) return 'warning';
+  if ((lo && v < mn + band) || (hi && v > mx - band)) return 'caution';
+  return 'nominal';
+}
+const LV = { nominal: ['●', 'NOMINAL'], caution: ['◆', 'CAUTION'], warning: ['▲', 'WARNING'], unknown: ['?', 'UNKNOWN'], stale: ['◌', 'STALE'] };
+const badge = lv => `<span class="badge lv-${lv}"><span aria-hidden="true">${LV[lv][0]}</span>${LV[lv][1]}</span>`;
+const lvSel = $('#lvSel'), lvSlider = $('#lvSlider');
+Object.keys(RANGES).forEach(k => lvSel.appendChild(h('option', { value: k }, k)));
+lvSel.value = 'oxy_pri_storage';
+const dp = r => (r[1] - r[0]) < 1 ? 3 : (r[1] - r[0]) < 10 ? 2 : 0;
+function setupSlider() {
+  const r = RANGES[lvSel.value], span = r[1] - r[0];
+  let lo = r[0] - span * 0.5, hi = r[1] + span * 0.5; if (r[0] >= 0) lo = Math.max(0, lo);
+  lvSlider.min = lo; lvSlider.max = hi; lvSlider.step = span / 400;
+  lvSlider.value = lvSel.value === 'oxy_pri_storage' ? 15 : (r[0] + r[1]) / 2;
+  renderLevels();
+}
+function renderLevels() {
+  const k = lvSel.value, r = RANGES[k], [mn, mx, chk] = r, v = +lvSlider.value, d = dp(r), u = unitOf(k);
+  const lo = +lvSlider.min, hi = +lvSlider.max, X = x => 20 + (x - lo) / (hi - lo) * 600, band = MARGIN * (mx - mn);
+  const svg = $('#lvBar'); svg.innerHTML = '';
+  const L = chk !== 'high', Hh = chk !== 'low';
+  const zones = [[lo, mn, L ? 'zone-w' : 'zone-x'], [mn, mn + band, L ? 'zone-c' : 'zone-n'], [mn + band, mx - band, 'zone-n'], [mx - band, mx, Hh ? 'zone-c' : 'zone-n'], [mx, hi, Hh ? 'zone-w' : 'zone-x']];
+  zones.forEach(([a, b, c]) => { if (b > a) s('rect', { x: X(a), y: 22, width: Math.max(0, X(b) - X(a)), height: 26, class: c }, svg); });
+  [mn, mx].forEach(t => { s('line', { x1: X(t), x2: X(t), y1: 16, y2: 54, stroke: 'currentColor', style: 'color:var(--muted)' }, svg); const tt = s('text', { x: X(t), y: 70, 'text-anchor': 'middle', class: 'tick' }, svg); tt.textContent = (t === mn ? 'min ' : 'max ') + t; });
+  s('line', { x1: X(v), x2: X(v), y1: 10, y2: 58, stroke: 'currentColor', 'stroke-width': 3, style: 'color:var(--ink)' }, svg);
+  s('circle', { cx: X(v), cy: 10, r: 5, fill: 'currentColor', style: 'color:var(--ink)' }, svg);
+  const vt = s('text', { x: Math.min(600, Math.max(40, X(v))), y: 86, 'text-anchor': 'middle', class: 'tick' }, svg); vt.textContent = v.toFixed(d) + (u ? ' ' + u : '');
+  const started = $('#lvStarted').checked, stale = $('#lvStale').checked, missing = $('#lvMissing').checked;
+  let level = classify(missing ? null : v, r), why;
+  if (missing) why = 'The value is missing or not a number, so the level is <b>unknown</b>.';
+  else if (!started) { level = 'nominal'; why = 'The EVA has not started, so every level is forced to <b>nominal</b>. The suit is not in use, so no alerts (this is how your current <code>classify_all</code> works).'; }
+  else why = `Check <b>${chk}</b> edge${chk === 'both' ? 's' : ''}. Warning outside [${mn}, ${mx}] on a checked edge. Caution within ${MARGIN * 100}% of the range (${+band.toFixed(4)}) inside a checked edge.`;
+  if (stale && !missing) { level = 'stale'; why = 'The link is down, so the number is old. The level becomes <b>stale</b>, whatever the value was, so nobody acts on old data.'; }
+  $('#lvRule').innerHTML = why;
+  const val = missing ? null : +v.toFixed(d);
+  $('#lvJson').textContent = JSON.stringify({ [k]: { value: val, unit: u || null, level } }, null, 2);
+  const text = val == null ? '—' : `${val}${u === '%' ? '%' : u ? ' ' + u : ''}`;
+  $('#lvVm').textContent = JSON.stringify({ label: k.replace(/_/g, ' '), text, level, style: `theme.level.${level}  (${LV[level][0]} ${LV[level][1]})`, emphasise: level === 'warning' || level === 'caution' }, null, 2);
+  $('#lvHudLab').textContent = k.replace(/_/g, ' '); $('#lvHudVal').textContent = text; $('#lvHudVal').className = 'big lv-' + level; $('#lvHudBadge').innerHTML = badge(level);
+}
+lvSel.addEventListener('change', setupSlider); lvSlider.addEventListener('input', renderLevels);
+['#lvStarted', '#lvStale', '#lvMissing'].forEach(id => $(id).addEventListener('change', renderLevels));
+setupSlider();
+
+/* ---------- 5. LINK ---------- */
+const BACKOFF = [0.5, 1, 2, 4];
+let L;
+function linkReset() {
+  L = { t: 0, tss: true, assigned: true, up: true, lastLeg: 0, lastDcu: 0, everDcu: true, sock: 'open', lastMsg: 0, tries: 0, nextTry: null, hud: null, hist: [], log: [], prevLink: 'ok' };
+  L.hud = backendState(); lkLog('Start: TSS on, IP assigned, backend running, client connected');
+}
+function lkLog(m) { L.log.unshift(`${L.t.toFixed(1).padStart(5)} s  ${m}`); L.log = L.log.slice(0, 40); }
+function backendState() {
+  const aL = L.t - L.lastLeg, aD = L.t - L.lastDcu, age = Math.min(aL, aD);
+  let tss = 'ok';
+  if (aL > 3 && aD > 3) tss = 'unreachable'; else if (!L.assigned) tss = 'unassigned';
+  const legacy = aL > 3 ? 'unreachable' : 'ok', subscription = !L.assigned ? 'unassigned' : aD > 3 ? 'unreachable' : 'ok';
+  return { tss, age: isFinite(age) ? age : null, paths: { legacy, subscription }, o2: 87, o2stale: aL > 3, sw: (!L.everDcu || aD > 3) ? null : 'PRI' };
+}
+function lkTick(dt) {
+  const prevT = L.t; L.t += dt;
+  const crossed = Math.floor(L.t) !== Math.floor(prevT);
+  if (L.up && L.tss && crossed) { L.lastLeg = L.t; if (L.assigned) { L.lastDcu = L.t; L.everDcu = true; } }
+  if (L.up) {
+    const bs = backendState();
+    if (bs.tss !== L.prevLink) { lkLog(`backend: link.tss ${L.prevLink} → ${bs.tss}`); L.prevLink = bs.tss; if (L.sock === 'open') { L.hud = bs; L.lastMsg = L.t; } }
+    if (L.sock === 'open' && crossed) { L.hud = bs; L.lastMsg = L.t; }
+  }
+  if (L.sock === 'retrying' && L.t >= L.nextTry) {
+    if (L.up) { L.sock = 'open'; L.tries = 0; L.nextTry = null; L.hud = backendState(); L.lastMsg = L.t; lkLog('client: reconnected, got full state at once'); }
+    else { const d = BACKOFF[Math.min(L.tries, BACKOFF.length - 1)]; L.tries++; L.nextTry = L.t + d; lkLog(`client: retry failed, next in ${d} s`); }
+  }
+  const seg = L.sock !== 'open' ? 'off' : L.hud.tss;
+  L.hist.push(seg); if (L.hist.length > 400) L.hist.shift();
+}
+function lkRender() {
+  $('#lkTss').textContent = 'TSS: ' + (L.tss ? 'on' : 'silent'); $('#lkTss').classList.toggle('on', !L.tss);
+  $('#lkAssign').textContent = 'Laptop IP: ' + (L.assigned ? 'assigned' : 'not assigned'); $('#lkAssign').classList.toggle('on', !L.assigned);
+  $('#lkBackend').textContent = 'Backend: ' + (L.up ? 'running' : 'stopped'); $('#lkBackend').classList.toggle('on', !L.up);
+  $('#lkTssState').textContent = L.tss ? 'sending' : 'silent';
+  $('#lkTssSub').textContent = L.tss ? (L.assigned ? 'legacy JSON + DCU/UIA push, 1 Hz' : 'legacy JSON only; Subscribe gets Ack 1') : 'no replies at all';
+  if (L.up) { const bs = backendState(); $('#lkLink').innerHTML = `<span class="${bs.tss === 'ok' ? 'ok' : 'bad'}">${bs.tss}</span>`; $('#lkAge').textContent = 'age_s = ' + (bs.age == null ? '—' : bs.age.toFixed(1)); $('#lkPathsOut').textContent = $('#lkPaths').checked ? `paths: legacy ${bs.paths.legacy}, subscription ${bs.paths.subscription}` : ''; }
+  else { $('#lkLink').innerHTML = '<span class="muted">process not running</span>'; $('#lkAge').textContent = ''; $('#lkPathsOut').textContent = ''; }
+  $('#lkSock').innerHTML = L.sock === 'open' ? '<span class="ok">open</span>' : '<span class="bad">closed</span>';
+  $('#lkRetry').textContent = L.sock === 'open' ? `last message ${(L.t - L.lastMsg).toFixed(1)} s ago` : `reconnecting with backoff · next try in ${Math.max(0, L.nextTry - L.t).toFixed(1)} s`;
+  const svg = $('#lkTl'); svg.innerHTML = '';
+  const COL = { ok: 'var(--nom)', unassigned: 'var(--cau)', unreachable: 'var(--warn)', off: 'var(--stale)' };
+  const w = 600 / 400; L.hist.forEach((sg, i) => s('rect', { x: 600 - (L.hist.length - i) * w, y: 6, width: w + .4, height: 26, style: `fill:${COL[sg]}` }, svg));
+  for (let sec = 0; sec <= 40; sec += 10) { const x = 600 - sec * 15; s('line', { x1: x, x2: x, y1: 32, y2: 38, stroke: 'currentColor', style: 'color:var(--muted)' }, svg); const t = s('text', { x: Math.max(12, Math.min(588, x)), y: 45, 'text-anchor': 'middle', class: 'tick' }, svg); t.textContent = sec ? `−${sec}s` : 'now'; }
+  $('#lkLog').innerHTML = L.log.map(m => `<div>${esc(m)}</div>`).join('');
+  const off = L.sock !== 'open', hd = L.hud;
+  const lvl = off || hd.o2stale ? 'stale' : 'nominal';
+  const chipTxt = off ? 'OFFLINE · backend not reachable' : hd.tss === 'ok' ? 'LINK OK' : hd.tss === 'unassigned' ? 'NOT ASSIGNED · assign IP in TSS web UI' : 'TSS UNREACHABLE · data is old';
+  const chipCls = off ? 'lv-stale' : hd.tss === 'ok' ? 'lv-nominal' : hd.tss === 'unassigned' ? 'lv-caution' : 'lv-warning';
+  $('#lkHud').innerHTML = `<div class="row"><div><div class="lab">Primary O₂</div><div class="big lv-${lvl}">${hd.o2}%</div></div>${badge(lvl)}</div>
+   <div class="row" style="margin-top:12px"><div><div class="lab">DCU oxygen</div><div style="font-size:24px;font-weight:700">${off || !hd.sw ? '—' : hd.sw}</div></div><span class="chip ${chipCls}">${chipTxt}</span></div>`;
+}
+setInterval(() => { if (current !== 'link') return; lkTick(0.1); lkRender(); }, 100);
+$('#lkTss').addEventListener('click', () => { L.tss = !L.tss; lkLog(L.tss ? 'TSS starts answering again' : 'TSS goes silent (crash, Wi-Fi drop, cable out)'); lkRender(); });
+$('#lkAssign').addEventListener('click', () => { L.assigned = !L.assigned; if (!L.assigned) L.everDcu = false; lkLog(L.assigned ? 'IP assigned in TSS web UI → next Subscribe gets Ack 0' : 'IP unassigned → Subscribe gets Ack 1, DCU stops'); lkRender(); });
+$('#lkBackend').addEventListener('click', () => {
+  L.up = !L.up;
+  if (!L.up) { L.sock = 'retrying'; L.tries = 1; L.nextTry = L.t + BACKOFF[0]; lkLog('backend stops → client sees socket close → shows OFFLINE at once'); }
+  else { L.lastLeg = -Infinity; L.lastDcu = -Infinity; L.prevLink = 'unreachable'; lkLog('backend starts, subscribes, waits for first data'); }
+  lkRender();
+});
+$('#lkPaths').addEventListener('change', lkRender);
+$('#lkReset').addEventListener('click', () => { linkReset(); lkRender(); });
+linkReset(); lkRender();
+
+/* ---------- 6. STATE vs DELTAS ---------- */
+const FIELDS = ['oxy_pri_storage', 'primary_battery_level', 'heart_rate', 'dcu.oxy', 'dcu.fan', 'eva.started'];
+let ST;
+function stReset() { ST = { server: { oxy_pri_storage: 92, primary_battery_level: 98, heart_rate: 88, 'dcu.oxy': 'SEC', 'dcu.fan': 'SEC', 'eva.started': true }, sent: 0, lost: 0, fullBytes: 0, deltaBytes: 0, tick: 0 }; ST.full = { ...ST.server }; ST.delta = { ...ST.server }; }
+function stStep() {
+  const prev = { ...ST.server }, sv = ST.server; ST.tick++;
+  if (ST.tick % 3 === 0) sv.oxy_pri_storage = Math.max(0, sv.oxy_pri_storage - 1);
+  if (ST.tick % 7 === 0) sv.primary_battery_level = Math.max(0, sv.primary_battery_level - 1);
+  if (Math.random() < 0.5) sv.heart_rate = Math.max(60, Math.min(150, sv.heart_rate + Math.round((Math.random() - 0.5) * 6)));
+  if (Math.random() < 0.08) sv['dcu.oxy'] = sv['dcu.oxy'] === 'PRI' ? 'SEC' : 'PRI';
+  if (Math.random() < 0.05) sv['dcu.fan'] = sv['dcu.fan'] === 'PRI' ? 'SEC' : 'PRI';
+  const changes = {}; FIELDS.forEach(f => { if (prev[f] !== sv[f]) changes[f] = sv[f]; });
+  const loss = +$('#stLoss').value / 100;
+  ST.sent++;
+  ST.fullBytes += JSON.stringify(sv).length; ST.deltaBytes += JSON.stringify(changes).length;
+  if (Math.random() < loss) ST.lost++; else { ST.full = { ...sv }; Object.assign(ST.delta, changes); }
+}
+function stRender() {
+  const fmt = v => v === undefined ? '<span class="muted">—</span>' : esc(v);
+  let rows = '<tr><th>field</th><th>backend (truth)</th><th>full-state client</th><th>delta client</th></tr>';
+  let wrongF = 0, wrongD = 0;
+  FIELDS.forEach(f => { const t = ST.server[f], a = ST.full[f], b = ST.delta[f]; if (a !== t) wrongF++; if (b !== t) wrongD++; rows += `<tr><td class="mono">${f}</td><td class="num">${fmt(t)}</td><td class="num ${a !== t ? 'mismatch' : ''}">${fmt(a)}</td><td class="num ${b !== t ? 'mismatch' : ''}">${fmt(b)}</td></tr>`; });
+  rows += `<tr><td class="muted">fields wrong now</td><td></td><td class="num ${wrongF ? 'mismatch' : ''}">${wrongF}</td><td class="num ${wrongD ? 'mismatch' : ''}">${wrongD}</td></tr>`;
+  $('#stTable').innerHTML = rows;
+  $('#stStats').textContent = `${ST.sent} messages sent, ${ST.lost} lost. Average size here: full ${ST.sent ? Math.round(ST.fullBytes / ST.sent) : 0} bytes, delta ${ST.sent ? Math.round(ST.deltaBytes / ST.sent) : 0} bytes. The real state will be a few KB, still tiny at 1 per second.`;
+}
+let stRun = true;
+setInterval(() => { if (current !== 'state' || !stRun) return; stStep(); stRender(); }, 700);
+$('#stRun').addEventListener('click', () => { stRun = !stRun; $('#stRun').textContent = stRun ? 'Pause' : 'Resume'; });
+$('#stLoss').addEventListener('input', e => { $('#stLossOut').textContent = e.target.value + '%'; });
+$('#stJoin').addEventListener('click', () => { ST.full = {}; ST.delta = {}; stRender(); });
+$('#stReset').addEventListener('click', () => { stReset(); stRender(); });
+stReset(); stRender();
+
+/* ---------- 7. RIG ---------- */
+const FOV = 100, R = 150, PANEL_HALF = 12;
+const MODES = {
+  lazy: ['Lazy follow (M1)', 'Stays put while you glance around. Once your head is more than 15° away, it eases back in front of you over about half a second. Calm and never lost. This is what the spec asks for.'],
+  head: ['Head-locked', 'Glued to your face. Always visible, but every tiny head movement moves the text too. Reading it is tiring and can cause nausea in a headset.'],
+  world: ['World-locked', 'Fixed in the room like a poster. Perfectly stable, but turn around and it is behind you. Good for a map pin, bad for vital alerts.'],
+};
+const rig = { mode: 'lazy', head: 0, target: 0, panel: 0, moving: false, jitter: 0, testing: false };
+const rigModes = $('#rigModes');
+for (const k in MODES) { const b = h('button', {}, MODES[k][0]); b.dataset.k = k; b.addEventListener('click', () => { rig.mode = k; if (k === 'world') rig.panel = 0; rigUi(); }); rigModes.appendChild(b); }
+function rigUi() { rigModes.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === rig.mode)); $('#rigDesc').textContent = MODES[rig.mode][1]; }
+const angDiff = (a, b) => ((a - b + 540) % 360 + 360) % 360 - 180;
+const norm = a => Math.round(((a % 360) + 540) % 360 - 180);
+const inView = () => Math.abs(angDiff(rig.panel, rig.head)) <= FOV / 2 - PANEL_HALF;
+function rigDraw() {
+  const svg = $('#rigSvg'); svg.innerHTML = '';
+  s('circle', { cx: 0, cy: 0, r: R, class: 'ring' }, svg);
+  const tt = s('text', { x: 0, y: -R - 10, 'text-anchor': 'middle', class: 'tick' }, svg); tt.textContent = '1.2 m';
+  const rad = a => (a - 90) * Math.PI / 180, a1 = rad(rig.head - FOV / 2), a2 = rad(rig.head + FOV / 2), RR = 190;
+  s('path', { d: `M0,0 L${RR * Math.cos(a1)},${RR * Math.sin(a1)} A${RR},${RR} 0 0 1 ${RR * Math.cos(a2)},${RR * Math.sin(a2)} Z`, class: 'fov' }, svg);
+  const p1 = rad(rig.panel - PANEL_HALF), p2 = rad(rig.panel + PANEL_HALF);
+  s('path', { d: `M${R * Math.cos(p1)},${R * Math.sin(p1)} A${R},${R} 0 0 1 ${R * Math.cos(p2)},${R * Math.sin(p2)}`, class: 'panelseg' + (inView() ? ' in' : ''), fill: 'none' }, svg);
+  s('circle', { cx: 0, cy: 0, r: 16, class: 'head' }, svg);
+  const n = rad(rig.head); s('circle', { cx: 13 * Math.cos(n), cy: 13 * Math.sin(n), r: 4, fill: 'currentColor', style: 'color:var(--ink)' }, svg);
+  $('#rigHead').textContent = norm(rig.head) + '°';
+  $('#rigPanel').textContent = norm(rig.panel) + '°';
+  $('#rigIn').innerHTML = inView() ? '<span class="ok verdict">yes</span>' : '<span class="bad verdict">no</span>';
+}
+let rigLast = 0, rigRaf = null;
+function rigFrame(now) {
+  const dt = Math.min(0.05, (now - (rigLast || now)) / 1000); rigLast = now;
+  const d = angDiff(rig.target, rig.head); rig.head += d * Math.min(1, dt * 8);
+  if (rig.jitter > 0) { rig.jitter -= dt; rig.head += Math.sin(now / 45) * 1.6; }
+  if (rig.mode === 'head') rig.panel = rig.head;
+  else if (rig.mode === 'lazy') {
+    const off = angDiff(rig.head, rig.panel);
+    if (Math.abs(off) > 15) rig.moving = true;
+    if (rig.moving) { rig.panel += off * (1 - Math.exp(-dt / 0.5)); if (Math.abs(off) < 2) rig.moving = false; }
+  }
+  $('#rigYaw').value = norm(rig.target);
+  rigDraw();
+  if (current === 'rig') rigRaf = requestAnimationFrame(rigFrame); else { rigRaf = null; rigLast = 0; }
+}
+function rigLoopStart() { if (!rigRaf) rigRaf = requestAnimationFrame(rigFrame); }
+$('#rigYaw').addEventListener('input', e => { rig.target = +e.target.value; });
+$('#rigL').addEventListener('click', () => { rig.target -= 90; });
+$('#rigR').addEventListener('click', () => { rig.target += 90; });
+$('#rigJit').addEventListener('click', () => { rig.jitter = 2; });
+$('#rigTest').addEventListener('click', () => {
+  if (rig.testing) return; rig.testing = true;
+  const out = $('#rigTestOut'), mode = rig.mode;
+  rig.target = rig.head = 0; rig.panel = 0; rig.moving = false;
+  out.textContent = 'Head at 0°. Turning 90° right…';
+  setTimeout(() => { rig.target = 90; out.textContent = 'Turned 90°. Waiting 2 s…'; }, 400);
+  setTimeout(() => { const ok = inView(); out.innerHTML = `${MODES[mode][0]}: panel inside the view after 2 s? ${ok ? '<span class="ok verdict">PASS</span>' : '<span class="bad verdict">FAIL</span>'}${mode === 'head' ? ' (passes, but fails the comfort goal: try the jitter button)' : ''}`; rig.testing = false; }, 2400);
+});
+rigUi(); rigDraw();
+
+/* ---------- 8. QUIZ ---------- */
+const LAYERS = ['tss/codec.py', 'tss/subscription.py', 'tss/mapping.py', 'core/ (store + levels)', 'contract.py', 'client net/', 'hud view model', 'theme.ts', 'scene/'];
+const Q1 = [
+  ['Decide that 15% oxygen is a warning', 3, 'Mission logic lives in the backend, so every display agrees and pytest can test it.'],
+  ['Turn DCU byte 1 = 1 into "PRI"', 2, 'The one flag table. Nothing after mapping sees a raw flag.'],
+  ['Choose red + triangle + "WARNING" for warnings', 7, 'How a level looks belongs to the display and is tuned for a dim room.'],
+  ['Reject a packet whose checksum is wrong', 0, 'codec checks the length and checksum before anything reads the data.'],
+  ['Turn the state into the text "15%"', 6, 'View models make every display decision, as pure functions vitest can check.'],
+  ['Resend Subscribe until an Ack arrives', 1, 'UDP can drop packets. subscription owns the retry and the Ack handling.'],
+  ['Reconnect after the backend restarts', 5, 'The client net layer owns the socket and the backoff.'],
+  ['Define which fields a state message has', 4, 'The single source of truth. TypeScript types are generated from it.'],
+  ['Keep the panel 1.2 m in front of the head', 8, 'The rig in the scene. It draws and follows, and decides nothing.'],
+];
+const q1 = $('#q1');
+Q1.forEach(([q], i) => {
+  const row = h('div', { class: 'qrow' });
+  row.innerHTML = `<div>${esc(q)}</div><select id="q1s${i}" aria-label="Layer for: ${esc(q)}"><option value="">choose…</option>${LAYERS.map((l, j) => `<option value="${j}">${esc(l)}</option>`).join('')}</select><span id="q1m${i}" aria-live="polite"></span><div class="qexp" id="q1e${i}" hidden></div>`;
+  q1.appendChild(row);
+});
+$('#q1Check').addEventListener('click', () => {
+  let score = 0;
+  Q1.forEach(([, ans, why], i) => {
+    const v = $('#q1s' + i).value, ok = v !== '' && +v === ans; if (ok) score++;
+    $('#q1m' + i).innerHTML = v === '' ? '' : ok ? '<span class="ok verdict">✓</span>' : '<span class="bad verdict">✗</span>';
+    const e = $('#q1e' + i); e.hidden = v === ''; e.innerHTML = ok ? esc(why) : `It lives in <b>${esc(LAYERS[ans])}</b>. ${esc(why)}`;
+  });
+  $('#q1Score').textContent = `${score} / ${Q1.length}`;
+});
+const Q2 = [['tss/codec.py', 1], ['tss/subscription.py', 1], ['tss/legacy.py', 1], ['tss/mapping.py', 1], ['sim/fake_tss.py', 1], ['data/recordings/*', 1], ['contract.py', 0], ['core/levels.py', 0], ['core/store.py', 0], ['app.py', 0], ['client/net/', 0], ['hud/o2.vm.ts', 0], ['scene/ panel', 0], ['theme.ts', 0]];
+const q2 = $('#q2');
+Q2.forEach(([f], i) => { q2.appendChild(h('label', {}, `<input type="checkbox" id="q2c${i}"> ${esc(f)}`)); });
+$('#q2Check').addEventListener('click', () => {
+  let right = 0;
+  Q2.forEach(([, should], i) => { const c = $('#q2c' + i), lab = c.parentElement, ok = c.checked === !!should; if (ok) right++; lab.classList.toggle('right', ok && c.checked); lab.classList.toggle('wrong', !ok); });
+  $('#q2Score').textContent = right === Q2.length ? 'All correct' : `${Q2.length - right} wrong (red)`; $('#q2Exp').hidden = false;
+});
+const Q3 = [
+  ['Someone flips the oxygen switch in the TSS web UI. List every hop until the HUD text changes. What is the worst-case delay, and what causes it?', 'TSS → DCU packet on 14141 → subscription receives it → codec checks and decodes it → mapping turns flag 1 into "PRI" → store builds a new State and sees a change → app.py sends it on /ws → client store → o2.vm.ts → panel. Worst case is about 1 s plus any batching (around 100 ms if decision B is option 2), because the TSS pushes DCU once a second. Everything after that takes milliseconds. Try it in the Event stepper tab.'],
+  ['Your laptop\'s IP isn\'t assigned to a team in the TSS web UI. What does the HUD show for oxygen %, the oxygen switch, and the link?', 'Oxygen % still works, because legacy ports need no assignment. The switch is unknown, because DCU arrives only over the new protocol and you got Ack 1. The link says "not assigned", so the operator knows what to fix. Try it in the Link tab.'],
+  ['Next month NASA moves suit telemetry into the new binary protocol. Which files change, and which must not?', 'Only backend/suits/tss/ (codec, subscription, mapping; legacy shrinks or goes), plus the fake TSS and a new recording. contract.py, core/ and the whole client stay the same, because they only see TssSnapshot and State. Test 7 fails if someone took a shortcut.'],
+  ['Oxygen is at 15%. Where is "15 is a warning" decided, and where is "warnings are red triangles" decided? Why in different places?', 'The level is decided in core/levels.py with data/ranges.json (backend). The look is decided in theme.ts through the view model (client). Logic stays in one place so every display and the voice assistant later agree, and pytest can test it. How it looks belongs to the display so it can be tuned for a dim room without touching logic.'],
+  ['The headset joins 10 minutes into the EVA, or Wi-Fi drops for 5 s. Why is no special code needed to catch up?', 'Every message is the full state. The first message after connecting contains everything and replaces the store. With deltas, a missed message leaves the HUD wrong until something re-syncs. See the Full state vs deltas tab.'],
+  ['Why does the replay test use raw datagrams instead of the decoded snapshots the old bridge saved?', 'Replaying raw bytes goes through the real decoder, so a decoder bug or protocol change shows up in the test. Replaying decoded data skips the decoder, which is the part most likely to break.'],
+];
+const q3 = $('#q3'), saved = store.get('m1x.answers', {});
+Q3.forEach(([q, a], i) => {
+  const d = h('div', { class: 'pq' });
+  d.innerHTML = `<b>Q${i + 1}. ${esc(q)}</b><textarea id="q3t${i}" placeholder="Your answer, in your own words"></textarea><div class="controls"><button id="q3b${i}">Reveal answer</button></div><div class="ans" id="q3a${i}" hidden>${esc(a)}</div>`;
+  q3.appendChild(d);
+  const ta = d.querySelector('textarea'); ta.value = saved[i] || '';
+  ta.addEventListener('input', () => { saved[i] = ta.value; store.set('m1x.answers', saved); });
+  d.querySelector('button').addEventListener('click', e => { const el = $('#q3a' + i); el.hidden = !el.hidden; e.target.textContent = el.hidden ? 'Reveal answer' : 'Hide answer'; });
+});
+
+show();
+})();
+</script>
