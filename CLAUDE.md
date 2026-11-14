@@ -6,8 +6,19 @@ A spacesuit heads-up display for a simulated lunar spacewalk. Final target: Meta
 
 1. `docs/plan/README.md` — status table and build order.
 2. Your milestone file in `docs/plan/milestones/`. It is your spec. Do not read the other milestone files unless yours links to them.
+   Then `docs/briefs/M<n>.md` if it exists. Its **Decisions taken** section is binding. If it conflicts with the milestone file, stop and ask.
 3. `docs/plan/architecture.md` — read once.
 4. `docs/notes/README.md` — the index. Open only the notes for your area.
+
+## Learning loop (Kenny and Vlad)
+
+Kenny and Vlad want to understand the design of each milestone (the components, how data flows and why it is built this way), not every function.
+
+1. **Before building:** in a separate session, run the `milestone-brief` skill ("brief M<n>"). It writes `docs/briefs/M<n>.md`. They read it, discuss it and decide the open points. Build only after that.
+2. **Build:** a builder session, as below.
+3. **After building:** run the `milestone-debrief` skill ("debrief M<n>"). It compares the plan with the code, runs a teach-back and adds exercises.
+
+Builder sessions do not run these skills themselves.
 
 ## Rules that protect the design
 
@@ -53,7 +64,7 @@ Backend modes, set with `SUITS_MODE`: `sim` (default, built-in fake TSS), `repla
 
 1. Every acceptance criterion in the milestone file passes, and `npm run check` is green. Put the summary lines in the walkthrough.
 2. If a criterion cannot be met, say so plainly to the user and in the walkthrough. Do not weaken the test.
-3. `docs/walkthroughs/M<n>.md` exists: one page with what was built, how data flows through it, three things to try, and three questions Kenny and Vlad should be able to answer.
+3. `docs/walkthroughs/M<n>.md` exists: one page with what was built, how data flows through it (including a Mermaid sequence diagram of one event, with the files it passes through), anything that differs from `docs/briefs/M<n>.md` and why, three things to try, and three questions Kenny and Vlad should be able to answer.
 4. New lessons are in `docs/notes/` (one per file, summary on line one, index updated). Wrong notes are fixed.
 5. The status table in `docs/plan/README.md` is updated.
 6. If the milestone file asks for a Fable review, stop and tell the user. Do not start the next milestone.
