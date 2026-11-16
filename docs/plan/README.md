@@ -1,6 +1,6 @@
 # Plan
 
-Written 2026-11-12. This replaces the earlier plan in Jira (Sprints 0–6) and the stack decision in `docs/decisions.md`.
+Written 2026-11-12. This replaces the earlier plan in Jira (Sprints 0–6) and the stack decision in `docs/archive/decisions.md`.
 
 ## The goal
 

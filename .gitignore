@@ -232,3 +232,11 @@ bridge/config.json
 
 data/recordings/run-*.jsonl
 bridge/ws_*.py
+
+# NASA SUITS HUD (M1 layout)
+vendor/
+models/
+data/recordings/*.jsonl
+!data/recordings/real-tss-*.jsonl
+test-results/
+playwright-report/

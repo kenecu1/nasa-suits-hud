@@ -1,0 +1,32 @@
+{
+  "_source": "NASA TSS2027 documents/telemetry_ranges/eva-telemetry-ranges.pdf (min and max = normal range). Edges that matter come from the notes in that PDF. Units are from the same PDF.",
+  "_how_it_works": "warning = outside [min, max] on a checked edge. caution = inside the range but within caution_margin x (max - min) of a checked edge. check says which edges matter: low, high or both. Values in unranged have a unit but no level check.",
+  "caution_margin": 0.10,
+  "ranges": {
+    "primary_battery_level": {"min": 20,    "max": 100,   "check": "low",  "unit": "%"},
+    "secondary_battery_level": {"min": 20,    "max": 100,   "check": "low",  "unit": "%"},
+    "oxy_pri_storage": {"min": 20,    "max": 100,   "check": "low",  "unit": "%"},
+    "oxy_sec_storage": {"min": 20,    "max": 100,   "check": "low",  "unit": "%"},
+    "oxy_pri_pressure": {"min": 600,   "max": 3000,  "check": "low",  "unit": "psi"},
+    "oxy_sec_pressure": {"min": 600,   "max": 3000,  "check": "low",  "unit": "psi"},
+    "coolant_storage": {"min": 80,    "max": 100,   "check": "low",  "unit": "%"},
+    "heart_rate": {"min": 50,    "max": 160,   "check": "both", "unit": "bpm"},
+    "oxy_consumption": {"min": 0.05,  "max": 0.15,  "check": "both", "unit": "psi/min"},
+    "co2_production": {"min": 0.05,  "max": 0.15,  "check": "both", "unit": "psi/min"},
+    "suit_pressure_oxy": {"min": 3.5,   "max": 4.1,   "check": "both", "unit": "psi"},
+    "suit_pressure_co2": {"min": 0.0,   "max": 0.1,   "check": "high", "unit": "psi"},
+    "suit_pressure_other": {"min": 0.0,   "max": 0.5,   "check": "high", "unit": "psi"},
+    "suit_pressure_total": {"min": 3.5,   "max": 4.5,   "check": "both", "unit": "psi"},
+    "helmet_pressure_co2": {"min": 0.0,   "max": 0.15,  "check": "high", "unit": "psi"},
+    "fan_pri_rpm": {"min": 29000, "max": 31000, "check": "both", "unit": "rpm"},
+    "fan_sec_rpm": {"min": 29000, "max": 31000, "check": "both", "unit": "rpm"},
+    "scrubber_a_co2_storage": {"min": 0,     "max": 60,    "check": "high", "unit": "%"},
+    "scrubber_b_co2_storage": {"min": 0,     "max": 60,    "check": "high", "unit": "%"},
+    "temperature": {"min": 10,    "max": 32,    "check": "both", "unit": "°C"},
+    "coolant_liquid_pressure": {"min": 100,   "max": 700,   "check": "both", "unit": "psi"},
+    "coolant_gas_pressure": {"min": 0,     "max": 700,   "check": "high", "unit": "psi"}
+  },
+  "unranged": {
+    "eva_elapsed_time": {"unit": "s"}
+  }
+}
