@@ -9,6 +9,11 @@ const clientPort = Number(process.env.SUITS_CLIENT_PORT ?? "5173");
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // One three.js for everything. The emulator's control panel (@iwer/devui) asks for an older
+    // copy of its own, but shares helper packages with the app; two copies mixed crash it.
+    dedupe: ["three"],
+  },
   server: {
     port: clientPort,
     strictPort: true,
@@ -28,6 +33,8 @@ export default defineConfig({
       "@react-three/xr",
       "@react-three/uikit",
       "@pmndrs/msdfonts/inter",
+      "iwer",
+      "@iwer/devui",
     ],
   },
   test: {

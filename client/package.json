@@ -17,6 +17,7 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "@iwer/devui": "^1.1.2",
     "@react-three/fiber": "^9.8.2",
     "@react-three/uikit": "^1.0.78",
     "@react-three/xr": "^6.6.32",

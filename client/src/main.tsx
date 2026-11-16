@@ -24,6 +24,13 @@ root.render(
   </StrictMode>,
 );
 
+// Dev server only: an emulated headset for trying Enter AR on the laptop.
+if (import.meta.env.DEV) {
+  void import("./scene/emulator")
+    .then(({ startDevEmulator }) => startDevEmulator())
+    .catch((error: unknown) => console.error("The headset emulator did not start", error));
+}
+
 // Dev only: when this module is replaced, do not leave a second socket running.
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
