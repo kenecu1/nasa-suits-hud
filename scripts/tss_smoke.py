@@ -5,8 +5,12 @@
     npm run tss:smoke -- --seconds 60 --record     the 60 s recording for a replay fixture
 
 It uses the same adapter as the backend (suits.tss), so if this prints sensible values the
-backend's live mode will too. Exit code 0 means DCU, UIA and telemetry all arrived and the
-link is ok; anything else exits 1 and says what is missing.
+backend's live mode will too. Exit code 0 means DCU, UIA and telemetry all arrived and are
+still fresh; anything else exits 1 and says what is missing.
+
+The real TSS answers status and faults only about every 7 s
+(docs/notes/tss-legacy-port-is-slow.md), so after a 5 s run the link is often still "stale"
+because faults have not come yet. That is reported, not counted as a failure.
 
 Before running: build and start the TSS (docs/notes/tss-build-and-run.md) and assign this
 laptop's IP to a team in the TSS web UI (docs/notes/tss-team-must-be-assigned.md).
@@ -23,7 +27,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from suits.contract import LinkStatus, TssSnapshot
+from suits.contract import STALE_AFTER_S, LinkStatus, TssSnapshot
 from suits.paths import RECORDINGS_DIR, REPO_ROOT
 from suits.tss.client import TssAddress, TssClient
 from suits.tss.recorder import Recorder
@@ -76,16 +80,29 @@ def describe(snapshot: TssSnapshot) -> str:
     return "\n".join(lines)
 
 
+# The three things this check is about. Status and faults come too slowly to demand in 5 s.
+REQUIRED = {"dcu": "DCU", "uia": "UIA", "telemetry": "telemetry"}
+# A link in one of these states is broken, whatever has arrived.
+BROKEN = (LinkStatus.UNASSIGNED, LinkStatus.UNREACHABLE, LinkStatus.BAD_DATA)
+
+
 def missing(snapshot: TssSnapshot) -> list[str]:
-    """What a healthy link must have delivered and has not."""
+    """What a healthy link must have delivered and has not, or has stopped delivering."""
+    received = {"dcu": snapshot.dcu is not None, "uia": snapshot.uia is not None,
+                "telemetry": bool(snapshot.telemetry)}
     problems = []
-    if snapshot.dcu is None:
-        problems.append("DCU")
-    if snapshot.uia is None:
-        problems.append("UIA")
-    if not snapshot.telemetry:
-        problems.append("telemetry")
+    for section, label in REQUIRED.items():
+        age = snapshot.ages.get(section)
+        if not received[section] or age is None:
+            problems.append(label)
+        elif age > STALE_AFTER_S[section]:
+            problems.append(f"{label} (last seen {age:.1f} s ago)")
     return problems
+
+
+def still_waiting(snapshot: TssSnapshot) -> list[str]:
+    """Slow sections that have not arrived yet. Worth saying, not a failure."""
+    return [section for section in ("status", "faults") if section not in snapshot.ages]
 
 
 async def smoke(address: TssAddress, seconds: float, recorder: Recorder | None = None,
@@ -109,8 +126,11 @@ async def smoke(address: TssAddress, seconds: float, recorder: Recorder | None =
 
     problems = missing(final)
     print()
-    if final.link == LinkStatus.OK and not problems and not dead:
-        print("OK: DCU, UIA and telemetry decoded, link ok.")
+    if final.link not in BROKEN and not problems and not dead:
+        print(f"OK: DCU, UIA and telemetry decoded, link {final.link.value}.")
+        if waiting := still_waiting(final):
+            print(f"Not received yet: {', '.join(waiting)}. The TSS answers these about every "
+                  "7 s; run with --seconds 15 to see them.")
         return 0
     print(f"FAILED: link is {final.link.value}"
           + (f"; missing {', '.join(problems)}" if problems else "")
