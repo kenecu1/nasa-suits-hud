@@ -4,7 +4,7 @@ One lesson per file. The first line of each file is a one-line summary. Read thi
 
 Add a note when you learn something a later session would otherwise have to rediscover (a TSS quirk, a tool trap, a headset finding). Do not add status reports or summaries of finished work. Fix or delete a note when it turns out to be wrong.
 
-File name: `<area>-<short-lesson>.md`. Areas so far: `tss`, `quest`, `xr`.
+File name: `<area>-<short-lesson>.md`. Areas so far: `tss`, `py`, `quest`, `xr`, `e2e`.
 
 ## Index
 
@@ -29,4 +29,8 @@ Quest and WebXR (from web research 2026-11-12, not yet checked on a device)
 - [quest-speech-runs-on-laptop](quest-speech-runs-on-laptop.md) — no browser speech recognition on Quest; do speech-to-text and text-to-speech on the laptop.
 - [quest-no-camera-access](quest-no-camera-access.md) — web pages cannot read the passthrough camera; no computer vision in the headset.
 - [quest-loading-dev-page](quest-loading-dev-page.md) — use `adb reverse` so the headset opens `http://localhost`.
-- [xr-emulation-headless-unverified](xr-emulation-headless-unverified.md) — running the WebXR emulator inside headless Playwright is plausible but unproven.
+
+WebXR emulation and end-to-end tests (verified in M1, 2026-11-16)
+- [xr-emulation-headless-works](xr-emulation-headless-works.md) — an `immersive-ar` session runs in headless Chromium with `iwer`, if `installRuntime` is forced. (Was `xr-emulation-headless-unverified`.)
+- [xr-dev-emulator-needs-one-three](xr-dev-emulator-needs-one-three.md) — the emulator control panel needs `resolve.dedupe: ["three"]`; the library's built-in emulator does not install in Chromium.
+- [e2e-backend-link-settles-after-start](e2e-backend-link-settles-after-start.md) — the sim link takes about 3 s to reach `ok` after a backend start; tests wait for it.

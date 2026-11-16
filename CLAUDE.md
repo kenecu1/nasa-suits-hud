@@ -42,21 +42,22 @@ M1 creates these unless a milestone is named. Whoever adds or changes a command 
 | `npm run dev` | Backend in sim mode + client. Open `http://localhost:5173` |
 | `npm run check` | Everything: ruff, pytest, contract drift, tsc, eslint, vitest, Playwright |
 | `npm run check:fast` | Same without Playwright |
+| `npm run e2e` | Playwright only: projects `desktop` and `xr` (emulated Quest 3, headless). It starts its own backend (port 8011) and client (port 5183), so `npm run dev` can stay open. One project: `npm run e2e -- --project=xr`. New screenshot baselines: `npm run e2e -- --update-snapshots` |
 | `npm run contract` | Regenerate TypeScript types from the Python contract |
-| `npm run tss:smoke` | Talk to a real TSS for 5 s and print decoded data (needs `TSS_HOST`); `-- --record` saves a recording |
+| `npm run tss:smoke` | Talk to a real TSS for 5 s and print decoded data (needs `TSS_HOST`, optional `TSS_TEAM`); exit code 1 if DCU, UIA or telemetry is missing. `-- --record` saves a recording; `-- --seconds 60 --record` for a replay fixture |
 | `npm run scenario -- <name>` | (M3) Play `data/scenarios/<name>.yaml` against the running backend's TSS source |
 | `npm run ml:train`, `npm run ml:evaluate` | (M5) Build the dataset and model; write `docs/ml/forecast-report.md` |
 | `npm run eval:voice` | (M6) Voice evaluation against the real API; needs `ANTHROPIC_API_KEY` |
 | `npm run demo` | (M8) Sim mode plus the full mission scenario |
 
-Backend modes, set with `SUITS_MODE`: `sim` (default, built-in fake TSS), `replay` (`SUITS_RECORDING=<file>`, optional `SUITS_REPLAY_SPEED`), `live` (`TSS_HOST`, `TSS_TEAM`). `SUITS_RECORD=1` saves raw TSS datagrams to `data/recordings/` in sim and live mode. The backend listens on port 8000 (`SUITS_PORT`); `/health` says `degraded` if a background task died or no state was sent for 3 s.
+Backend modes, set with `SUITS_MODE`: `sim` (default, built-in fake TSS), `replay` (`SUITS_RECORDING=<file>`, optional `SUITS_REPLAY_SPEED`), `live` (`TSS_HOST`, `TSS_TEAM`). `SUITS_RECORD=1` saves raw TSS datagrams to `data/recordings/` in sim and live mode. The backend listens on port 8000 (`SUITS_PORT`); `/health` says `degraded` if a background task died or no state was sent for 3 s. The client reaches the backend through the page's own origin: the dev server forwards `/ws` and `/health` to `SUITS_PORT`. `SUITS_CLIENT_PORT` changes the page's port (default 5173).
 
 ## Testing
 
 - **Without the TSS (the normal case):** `npm run check`. The backend runs against the fake TSS or a recording.
 - **With the real TSS (smoke only):** build and run it in WSL (`docs/notes/tss-build-and-run.md`), assign the laptop's IP to a team in the TSS web UI, then `npm run tss:smoke`, then `SUITS_MODE=live npm run dev`.
-- **Headset view without a headset:** the same scene runs in an emulated WebXR session. Playwright does this in `e2e/xr/`. By hand: `npm run dev` and use the emulator panel on the page.
-- HUD content is not in the DOM. Tests read `window.__hud` (the current view models) and compare screenshots.
+- **Headset view without a headset:** the same scene runs in an emulated WebXR session. Playwright does this in `e2e/xr/`. By hand: `npm run dev`, press Enter AR and use the emulator panel that appears (dev server on localhost only; `?emulator=off` in the address leaves it out).
+- HUD content is not in the DOM. Tests read `window.__hud` (`panels`: the current view models; `view`: what the renderer measured, such as draw calls and whether the panel is in view) and compare screenshots. Baselines are in `e2e/screenshots/`.
 - **Screenshots:** baselines are committed for Windows only and compared with `maxDiffPixelRatio: 0.02`. CI (Linux) runs the same tests with snapshot comparison off and uploads the screenshots. Assertions on `window.__hud` are the real check; screenshots catch layout accidents.
 - **NASA's TSS source** is in `vendor/TSS2027` after setup (pinned commit in `backend/suits/tss/VERSION`).
 
