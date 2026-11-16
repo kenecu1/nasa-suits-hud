@@ -60,6 +60,28 @@ def test_captured_recording_goes_through_the_whole_decoder():
     assert last.telemetry["coolant_storage"] == 0  # the sample run skipped egress
 
 
+REAL = RECORDINGS_DIR / "real-tss-6293795.jsonl"  # committed (acceptance 16)
+
+
+def test_real_recording_shows_what_was_done_to_the_tss():
+    # 70 s against TSS2027 6293795 in WSL, 2026-11-16. During it: fan switch to PRI (~25 s),
+    # fan fault on (~35 s) and off (~50 s), oxygen switch to SEC (~58 s).
+    snapshots = replay_snapshots(REAL)
+    t0 = snapshots[0].t
+    after_start = [s for s in snapshots if s.t - t0 > 8]
+
+    def seen(predicate):
+        return [round(s.t - t0) for s in snapshots if predicate(s)]
+
+    assert all(s.link == LinkStatus.OK for s in after_start)
+    assert all(len(s.telemetry) == 23 and s.started for s in after_start)
+    assert all(s.ages["telemetry"] < 4.0 for s in after_start)  # the poller kept up
+    assert seen(lambda s: s.faults is not None and s.faults.fan)[0] in range(35, 45)
+    assert snapshots[-1].faults.fan is False
+    assert seen(lambda s: s.dcu is not None and s.dcu.fan == "PRI")[0] in range(25, 30)
+    assert seen(lambda s: s.dcu is not None and s.dcu.oxy == "SEC")[0] in range(58, 62)
+
+
 def test_recorder_writes_what_replay_reads(tmp_path):
     path = tmp_path / "rec.jsonl"
     clock = iter([10.0, 10.5])
