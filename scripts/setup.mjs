@@ -50,10 +50,8 @@ run(py, ["-m", "pip", "install", "--quiet", "-e", "backend[dev]"]);
 // 2. Node (root + client workspace)
 run("npm", ["install"]);
 
-// 3. Playwright browsers (once the e2e harness exists)
-if (existsSync(join(ROOT, "node_modules", "@playwright", "test"))) {
-  run("npx", ["playwright", "install", "chromium"]);
-}
+// 3. The browser the end-to-end tests drive. CI machines also need its system libraries.
+run("npx", ["playwright", "install", ...(process.env.CI ? ["--with-deps"] : []), "chromium"]);
 
 // 4. NASA's TSS at the pinned commit (gitignored, for reference and the live smoke test)
 const pinned = readFileSync(join(ROOT, "backend", "suits", "tss", "VERSION"), "utf8").split(/\s/)[0];
