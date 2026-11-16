@@ -1,6 +1,7 @@
 """Packet codec: captured packets from docs/notes/tss-packet-format.md, and the error cases."""
 
 import pytest
+
 from suits.tss import codec
 from suits.tss.codec import Code, Device
 from suits.tss.source import TssSource

@@ -7,7 +7,6 @@ from suits.contract import STALE_AFTER_S, LinkStatus
 from suits.sim.fake_tss import FakeTss
 from suits.tss.client import TssAddress, TssClient
 from suits.tss.source import TssSource
-
 from tests.helpers import wait_until
 
 
@@ -49,7 +48,7 @@ async def test_link_recovers_when_the_tss_starts_after_the_backend():
         assert source.snapshot().link == LinkStatus.UNREACHABLE
 
         async with FakeTss(sub_port=sub_port, legacy_port=legacy_port):
-            await wait_until(lambda: source.snapshot().link == LinkStatus.OK, timeout=6)
+            await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=6)
     finally:
         await client.stop()
 
@@ -60,15 +59,15 @@ async def test_bad_binary_over_real_udp_does_not_stop_the_receive_loop():
         client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
         client.start()
         try:
-            await wait_until(lambda: source.snapshot().dcu is not None, timeout=3)
+            await wait_until(lambda: source.snapshot().dcu is not None, within=3)
             good = bytes.fromhex("6af55d34001100010003000000000000e5")
 
             fake.send_raw(good[:-1] + b"\x00")  # bad checksum
             fake.send_raw(good[:5])  # too short
-            await wait_until(lambda: source.decode_errors >= 2, timeout=2)
+            await wait_until(lambda: source.decode_errors >= 2, within=2)
 
             fake.state["dcu"]["oxy"] = False
-            await wait_until(lambda: source.snapshot().dcu.oxy == "SEC", timeout=3)
+            await wait_until(lambda: source.snapshot().dcu.oxy == "SEC", within=3)
         finally:
             await client.stop()
 
@@ -84,7 +83,7 @@ async def test_a_failing_recorder_does_not_stop_the_link():
         )
         client.start()
         try:
-            await wait_until(lambda: source.snapshot().link == LinkStatus.OK, timeout=4)
+            await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=4)
         finally:
             await client.stop()
 
@@ -96,10 +95,10 @@ async def test_one_device_going_quiet_is_resubscribed_on_its_own():
         client.subscription.resubscribe_after_s = 1.5
         client.start()
         try:
-            await wait_until(lambda: source.snapshot().uia is not None, timeout=3)
+            await wait_until(lambda: source.snapshot().uia is not None, within=3)
             fake.subscribers.pop(2)  # the TSS forgets UIA only; DCU keeps arriving
 
-            await wait_until(lambda: 2 in fake.subscribers, timeout=4)
+            await wait_until(lambda: 2 in fake.subscribers, within=4)
         finally:
             await client.stop()
 
@@ -115,7 +114,7 @@ async def test_late_acks_are_not_thrown_away():
         client.subscription.retry_s = 0.5
         client.start()
         try:
-            await wait_until(lambda: len(fake.subscribers) == 2, timeout=4)
+            await wait_until(lambda: len(fake.subscribers) == 2, within=4)
         finally:
             await client.stop()
 

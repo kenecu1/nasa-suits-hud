@@ -1,6 +1,7 @@
 """Every raw flag -> named position, one switch at a time (a swapped byte must fail here)."""
 
 import pytest
+
 from suits.tss import codec
 from suits.tss.mapping import BadField, dcu_positions, telemetry_values, uia_positions
 from suits.tss.source import TssSource

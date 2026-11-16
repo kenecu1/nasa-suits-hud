@@ -3,12 +3,12 @@
 import asyncio
 
 import pytest
+
 from suits.contract import LinkStatus
 from suits.sim.fake_tss import FakeTss
 from suits.tss import codec
 from suits.tss.client import TssAddress, TssClient
 from suits.tss.source import TssSource
-
 from tests.helpers import wait_until
 
 
@@ -38,7 +38,7 @@ async def test_first_full_snapshot_arrives_within_3_s(fake, link):
     source, client = link
     client.start()
 
-    await wait_until(lambda: has_everything(source), timeout=3)
+    await wait_until(lambda: has_everything(source), within=3)
 
     snap = source.snapshot()
     assert snap.dcu.oxy == "PRI"  # the fake's default oxygen switch is primary
@@ -50,7 +50,7 @@ async def test_a_dropped_subscribe_is_sent_again(fake, link):
     fake.drop_subscribes = 1
     client.start()
 
-    await wait_until(lambda: source.snapshot().dcu is not None, timeout=3)
+    await wait_until(lambda: source.snapshot().dcu is not None, within=3)
 
     # DCU dropped once, then DCU again, then UIA
     assert fake.subscribes_received >= 3
@@ -61,8 +61,8 @@ async def test_ack_1_means_unassigned_but_legacy_values_still_arrive(fake, link)
     fake.ack_result = codec.AckResult.UNASSIGNED
     client.start()
 
-    await wait_until(lambda: source.snapshot().link == LinkStatus.UNASSIGNED, timeout=3)
-    await wait_until(lambda: bool(source.snapshot().telemetry), timeout=3)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.UNASSIGNED, within=3)
+    await wait_until(lambda: bool(source.snapshot().telemetry), within=3)
 
     snap = source.snapshot()
     assert snap.dcu is None  # no push without assignment
@@ -73,25 +73,25 @@ async def test_assigning_the_team_later_recovers_without_restart(fake, link):
     source, client = link
     fake.ack_result = codec.AckResult.UNASSIGNED
     client.start()
-    await wait_until(lambda: source.snapshot().link == LinkStatus.UNASSIGNED, timeout=3)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.UNASSIGNED, within=3)
 
     fake.ack_result = codec.AckResult.OK
 
-    await wait_until(lambda: source.snapshot().dcu is not None, timeout=4)
-    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, timeout=3)
+    await wait_until(lambda: source.snapshot().dcu is not None, within=4)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=3)
 
 
 async def test_resubscribes_when_the_tss_forgets_us(fake, link):
     source, client = link
     client.subscription.resubscribe_after_s = 1.5
     client.start()
-    await wait_until(lambda: source.snapshot().dcu is not None, timeout=3)
+    await wait_until(lambda: source.snapshot().dcu is not None, within=3)
 
     fake.subscribers.clear()  # a TSS restart loses every subscription
     sent_before = fake.subscribes_received
 
-    await wait_until(lambda: fake.subscribes_received > sent_before, timeout=3)
-    await wait_until(lambda: bool(fake.subscribers), timeout=2)
+    await wait_until(lambda: fake.subscribes_received > sent_before, within=3)
+    await wait_until(lambda: bool(fake.subscribers), within=2)
 
 
 # ---- acceptance 5: legacy path and link loss ----
@@ -102,7 +102,7 @@ async def test_telemetry_status_and_faults_are_parsed(fake, link):
     fake.state["error"]["fan_error"] = True
     client.start()
 
-    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, timeout=3)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=3)
 
     snap = source.snapshot()
     assert snap.telemetry["oxy_pri_storage"] == 92.0
@@ -116,10 +116,10 @@ async def test_telemetry_status_and_faults_are_parsed(fake, link):
 async def test_silent_tss_becomes_unreachable_within_3_s_and_age_grows(fake, link):
     source, client = link
     client.start()
-    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, timeout=3)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=3)
 
     fake.silent = True
-    waited = await wait_until(lambda: source.snapshot().link == LinkStatus.UNREACHABLE, timeout=3)
+    waited = await wait_until(lambda: source.snapshot().link == LinkStatus.UNREACHABLE, within=3)
 
     first = source.snapshot().age_s
     await asyncio.sleep(0.3)
@@ -132,11 +132,11 @@ async def test_silent_tss_becomes_unreachable_within_3_s_and_age_grows(fake, lin
 async def test_bad_json_gives_bad_data(fake, link):
     source, client = link
     client.start()
-    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, timeout=3)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=3)
 
     fake.bad_json = True
 
-    await wait_until(lambda: source.snapshot().link == LinkStatus.BAD_DATA, timeout=2)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.BAD_DATA, within=2)
     assert source.decode_errors > 0
 
 
@@ -144,8 +144,8 @@ async def test_link_recovers_after_bad_json_stops(fake, link):
     source, client = link
     fake.bad_json = True
     client.start()
-    await wait_until(lambda: source.snapshot().link == LinkStatus.BAD_DATA, timeout=3)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.BAD_DATA, within=3)
 
     fake.bad_json = False
 
-    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, timeout=3)
+    await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=3)

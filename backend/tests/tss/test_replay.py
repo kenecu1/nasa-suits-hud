@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import pytest
+
 from suits.contract import LinkStatus
 from suits.paths import RECORDINGS_DIR
 from suits.tss.recorder import (

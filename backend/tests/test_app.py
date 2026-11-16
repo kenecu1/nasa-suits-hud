@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+
 from suits.app import create_app
 from suits.contract import Mode
 from suits.settings import Settings, SettingsError

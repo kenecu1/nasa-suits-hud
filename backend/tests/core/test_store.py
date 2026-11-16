@@ -1,6 +1,7 @@
 """TssSnapshot -> State: levels, staleness, unknowns, change detection."""
 
 import pytest
+
 from suits.contract import (
     STALE_AFTER_S,
     DcuPositions,

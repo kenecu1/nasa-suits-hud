@@ -5,6 +5,7 @@ import socket
 import struct
 
 import pytest
+
 from suits.sim.fake_tss import LEGACY_SETS, FakeTss
 from suits.tss import codec
 
