@@ -9,6 +9,7 @@ Measured live against TSS2027 commit 6293795 in WSL (2026-11-16, M1 builder sess
 **Rules:**
 - One request in flight per team port: send the next when the reply arrives or after a timeout (`suits/tss/legacy.py`). Telemetry gets most turns; status and faults every sixth.
 - Expect telemetry about every 1.2–2.4 s and status/faults about every 7 s. Staleness limits per section are in `STALE_AFTER_S` (`suits/contract.py`).
+- Measured in the committed recording `data/recordings/real-tss-6293795.jsonl` with the one-at-a-time poller: telemetry every 1.0–3.3 s (mean 1.7), status every 5.5–7.8 s and faults every 5.5–8.9 s (mean 6.8 each). So a fault flag can reach the HUD up to about 9 s after the TSS sets it.
 - Anything else that writes to the same port (a scenario driver sending SET 2001–2020) shares this budget. Send SETs one at a time and wait for the 4-byte reply.
 - If a previous client flooded the port, its queue is still there: replies stay late until it drains. Restart the TSS if in doubt.
 - The fake TSS can emulate this (`FakeTss(legacy_service_s=...)`); `tests/tss/test_link_resilience.py` fails if the poller ever queues requests. Sim mode uses 0.3 s.

@@ -22,6 +22,7 @@ TSS (verified against TSS2027 commit 6293795, 2026-11-10, unless stated)
 
 Python (verified in M1, 2026-11-16)
 - [py-windows-udp-goes-deaf](py-windows-udp-goes-deaf.md) — on Windows' Proactor loop a UDP socket stops receiving after "port unreachable"; close and reopen it.
+- [py-starlette-ws-use-anyio-tasks](py-starlette-ws-use-anyio-tasks.md) — in a WebSocket handler use an anyio task group; raw asyncio tasks made a CancelledError escape now and then.
 
 Quest and WebXR (from web research 2026-11-12, not yet checked on a device)
 - [quest-no-dom-overlay](quest-no-dom-overlay.md) — HTML cannot be shown inside an immersive session; the HUD must be drawn in WebGL.

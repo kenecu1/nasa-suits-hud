@@ -7,5 +7,6 @@ TSS2027 HEAD (6293795) does not compile because `src/groups.h` contains merge-co
 - It binds to the machine's last non-loopback IPv4 address and prints it.
 - Source for builder sessions: `https://github.com/SUITS-Techteam/TSS2027`, verified commit `6293795`. M1 adds a setup step that clones it into `vendor/TSS2027` (gitignored). Milestones copy what they need from there into the repo (map images, `data/RockData.json`, procedure PDFs).
 - Vlad's existing clone: WSL distro `Ubuntu`, `/root/nasa_suits/TSS2027` (has a local edit in `scripts/test_socket.py`).
+- The M1 recording (`data/recordings/real-tss-6293795.jsonl`) came from a separate copy, `/root/tss-m1` at commit `6293795`, whose only change is the `src/groups.h` conflict fix above. So the legacy rate limit ([tss-legacy-port-is-slow](tss-legacy-port-is-slow.md)) comes from unpatched `server.c` and `network.c`.
 
 Most tests must not need the real TSS. Use the fake TSS in the repo (built in M1) and recordings. The real TSS is for the live smoke check only.
