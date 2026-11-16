@@ -17,7 +17,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from suits.contract import SECTIONS, STALE_AFTER_S, LinkStatus, Section, TssSnapshot
+from suits.contract import (
+    LINK_SILENT_AFTER_S,
+    SECTIONS,
+    STALE_AFTER_S,
+    LinkStatus,
+    Section,
+    TssSnapshot,
+)
 from suits.tss import codec, mapping
 
 log = logging.getLogger(__name__)
@@ -64,6 +71,7 @@ class TssSource:
         self._sections: dict[Section, _Received] = {}
         self._channels: dict[str, _ChannelHealth] = {}
         self._unassigned_at: float | None = None
+        self._last_valid_at: float | None = None  # any datagram that decoded, Acks included
         self.decode_errors = 0
         self.last_error: str | None = None
 
@@ -86,14 +94,22 @@ class TssSource:
             else:
                 raise codec.CodecError(f"unknown channel {channel!r}")
         except codec.CodecError as exc:
-            self._mark(channel, ok=False)
-            self.decode_errors += 1
-            self.last_error = f"{channel}: {exc}"
+            self._bad(channel, exc)
             log.warning("bad TSS datagram on %s: %s (%d bytes)", channel, exc, len(datagram))
-            self._changed()
+            return None
+        except Exception as exc:  # e.g. RecursionError on absurd JSON: still bad data, not a crash
+            self._bad(channel, exc)
+            log.exception("unexpected error decoding a TSS datagram on %s", channel)
             return None
         self._mark(channel, ok=True)
+        self._last_valid_at = self._clock()
         return result
+
+    def _bad(self, channel: str, exc: Exception) -> None:
+        self._mark(channel, ok=False)
+        self.decode_errors += 1
+        self.last_error = f"{channel}: {exc}"
+        self._changed()
 
     def _on_packet(self, packet: codec.Packet) -> None:
         if packet.code == codec.Code.ACK:
@@ -160,16 +176,17 @@ class TssSource:
         return default_factory() if default_factory else None
 
     def _link(self, now: float, ages: dict[Section, float]) -> LinkStatus:
-        def recent(at: float) -> bool:
-            return now - at <= STALE_AFTER_S
+        """Worst first: unassigned, bad_data, unreachable, stale, ok (decision A)."""
 
-        if self._unassigned_at is not None and recent(self._unassigned_at):
+        def recent(at: float | None) -> bool:
+            return at is not None and now - at <= LINK_SILENT_AFTER_S
+
+        if recent(self._unassigned_at):
             return LinkStatus.UNASSIGNED
         if any(not h.last_ok and recent(h.at) for h in self._channels.values()):
             return LinkStatus.BAD_DATA
-        fresh = [s for s in SECTIONS if s in ages and ages[s] <= STALE_AFTER_S]
-        if not fresh:
+        if not recent(self._last_valid_at):
             return LinkStatus.UNREACHABLE
-        if len(fresh) < len(SECTIONS):
+        if any(s not in ages or ages[s] > STALE_AFTER_S[s] for s in SECTIONS):
             return LinkStatus.STALE
         return LinkStatus.OK

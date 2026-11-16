@@ -110,7 +110,7 @@ async def test_telemetry_status_and_faults_are_parsed(fake, link):
     assert snap.started is True
     assert snap.faults.fan is True
     assert snap.faults.oxy is False
-    assert sorted(fake.legacy_gets[:3]) == [1, 2, 4]
+    assert {1, 2, 4} <= set(fake.legacy_gets)  # every section is polled
 
 
 async def test_silent_tss_becomes_unreachable_within_3_s_and_age_grows(fake, link):

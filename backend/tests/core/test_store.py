@@ -62,14 +62,14 @@ def test_missing_value_is_unknown():
 
 
 def test_old_telemetry_is_stale_but_keeps_its_number():
-    s = state(snapshot({"oxy_pri_storage": 15.0}, age=STALE_AFTER_S + 0.1))
+    s = state(snapshot({"oxy_pri_storage": 15.0}, age=max(STALE_AFTER_S.values()) + 0.1))
 
     assert s.suit.values["oxy_pri_storage"].level == Level.STALE
     assert s.suit.values["oxy_pri_storage"].value == 15.0
 
 
 def test_old_switches_and_status_become_unknown():
-    s = state(snapshot(age=STALE_AFTER_S + 0.1))
+    s = state(snapshot(age=max(STALE_AFTER_S.values()) + 0.1))
 
     assert s.dcu is None
     assert s.eva.started is None
@@ -113,3 +113,19 @@ def test_store_numbers_only_committed_states():
 
     assert first.seq == again.seq == 1
     assert store.preview(snapshot()).seq == 2
+
+
+def test_a_stale_not_started_does_not_silence_alarms():
+    # status said "not started" long ago and has gone quiet, while telemetry is fresh
+    ages = {"telemetry": 0.5, "status": STALE_AFTER_S["status"] + 1, "faults": 0.5,
+            "dcu": 0.5, "uia": 0.5}
+    s = state(snapshot({"oxy_pri_storage": 15.0}, started=False, ages=ages))
+
+    assert s.suit.values["oxy_pri_storage"].level == Level.WARNING
+    assert s.eva.started is None
+
+
+def test_a_fresh_not_started_does_silence_alarms():
+    s = state(snapshot({"oxy_pri_storage": 15.0}, started=False))
+
+    assert s.suit.values["oxy_pri_storage"].level == Level.NOMINAL

@@ -28,14 +28,15 @@ ELAPSED = "eva_elapsed_time"
 
 def _fresh(snapshot: TssSnapshot, section: Section) -> bool:
     age = snapshot.ages.get(section)
-    return age is not None and age <= STALE_AFTER_S
+    return age is not None and age <= STALE_AFTER_S[section]
 
 
 def suit_values(snapshot: TssSnapshot, ranges: dict[str, Any]) -> dict[str, SuitValue]:
     """Every value named in ranges.json ("ranges" and "unranged"), always all of them."""
     fresh = _fresh(snapshot, "telemetry")
-    # before the EVA starts the TSS reads zeros: no alarms (unknown status counts as started)
-    started = snapshot.started is not False
+    # Before the EVA starts the TSS reads zeros, so no alarms. Only a fresh "not started"
+    # silences them: unknown or stale status counts as started, so alarms stay on.
+    started = not (snapshot.started is False and _fresh(snapshot, "status"))
     margin = ranges["caution_margin"]
     values: dict[str, SuitValue] = {}
     for name, spec in {**ranges["ranges"], **ranges.get("unranged", {})}.items():

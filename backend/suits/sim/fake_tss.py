@@ -19,9 +19,11 @@ import copy
 import json
 import logging
 import time
+from collections import deque
 from collections.abc import Callable
 from typing import Any
 
+from suits.tasks import cancel_all, spawn
 from suits.tss import codec
 
 log = logging.getLogger(__name__)
@@ -111,8 +113,13 @@ def _flag(value: Any) -> int:
 
 
 class _Server(asyncio.DatagramProtocol):
-    def __init__(self, handle: Callable[[bytes, tuple[str, int]], None]) -> None:
+    def __init__(
+        self,
+        handle: Callable[[bytes, tuple[str, int]], None],
+        on_error: Callable[[], None],
+    ) -> None:
         self._handle = handle
+        self._on_error = on_error
         self.transport: asyncio.DatagramTransport | None = None
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
@@ -126,11 +133,18 @@ class _Server(asyncio.DatagramProtocol):
             log.exception("fake TSS failed on a datagram")
 
     def error_received(self, exc: Exception) -> None:
+        # e.g. a push to a client socket that has closed. On Windows' Proactor loop the socket
+        # would stop receiving, so the fake rebinds the same port.
         log.debug("fake TSS socket error: %s", exc)
+        self._on_error()
 
     def send(self, data: bytes, addr: tuple[str, int]) -> None:
         if self.transport is not None and not self.transport.is_closing():
             self.transport.sendto(data, addr)
+
+    def close(self) -> None:
+        if self.transport is not None:
+            self.transport.close()
 
 
 class FakeTss:
@@ -140,11 +154,15 @@ class FakeTss:
         sub_port: int = 0,
         legacy_port: int = 0,
         push_interval_s: float = 1.0,
+        legacy_service_s: float = 0.0,
         state: dict[str, Any] | None = None,
     ) -> None:
+        """``legacy_service_s`` > 0 serves one legacy datagram per that many seconds, like the
+        real TSS (about 1.2 s; docs/notes/tss-legacy-port-is-slow.md). 0 answers at once."""
         self.host = host
-        self._ports = (sub_port, legacy_port)
+        self._ports = [sub_port, legacy_port]
         self.push_interval_s = push_interval_s
+        self.legacy_service_s = legacy_service_s
         self.state = state if state is not None else default_state()
         # test controls
         self.ack_result = codec.AckResult.OK
@@ -155,32 +173,55 @@ class FakeTss:
         self.subscribers: dict[int, tuple[str, int]] = {}
         self.subscribes_received = 0
         self.legacy_gets: list[int] = []
+        self.legacy_max_queue = 0  # deepest legacy backlog seen (with legacy_service_s > 0)
+        self._legacy_queue: deque[tuple[bytes, tuple[str, int]]] = deque()
         self._sub: _Server | None = None
         self._legacy: _Server | None = None
-        self._push_task: asyncio.Task | None = None
+        self._tasks: list[asyncio.Task] = []
 
     # ---- lifecycle ----
 
     async def start(self) -> None:
+        try:
+            self._sub = await self._bind(0, self._on_sub)
+            self._legacy = await self._bind(1, self._on_legacy_datagram)
+        except BaseException:
+            await self.stop()
+            raise
+        self._tasks = [spawn(self._push_loop(), "fake-tss-push")]
+        if self.legacy_service_s > 0:
+            self._tasks.append(spawn(self._legacy_worker(), "fake-tss-legacy"))
+
+    async def _bind(self, which: int, handle: Callable[[bytes, tuple[str, int]], None]) -> _Server:
         loop = asyncio.get_running_loop()
-        _, self._sub = await loop.create_datagram_endpoint(
-            lambda: _Server(self._on_sub), local_addr=(self.host, self._ports[0])
+        _, server = await loop.create_datagram_endpoint(
+            lambda: _Server(handle, lambda: self._schedule_rebind(which)),
+            local_addr=(self.host, self._ports[which]),
         )
-        _, self._legacy = await loop.create_datagram_endpoint(
-            lambda: _Server(self._on_legacy), local_addr=(self.host, self._ports[1])
-        )
-        self._push_task = asyncio.create_task(self._push_loop(), name="fake-tss-push")
+        self._ports[which] = server.transport.get_extra_info("sockname")[1]  # keep the port
+        return server
+
+    def _schedule_rebind(self, which: int) -> None:
+        self._tasks.append(spawn(self._rebind(which), f"fake-tss-rebind-{which}"))
+
+    async def _rebind(self, which: int) -> None:
+        old = self._sub if which == 0 else self._legacy
+        if old is not None:
+            old.close()
+        await asyncio.sleep(0)  # let the close finish before binding the same port
+        handle = self._on_sub if which == 0 else self._on_legacy_datagram
+        new = await self._bind(which, handle)
+        if which == 0:
+            self._sub = new
+        else:
+            self._legacy = new
 
     async def stop(self) -> None:
-        if self._push_task is not None:
-            self._push_task.cancel()
-            try:
-                await self._push_task
-            except asyncio.CancelledError:
-                pass
+        await cancel_all(self._tasks)
+        self._tasks = []
         for server in (self._sub, self._legacy):
-            if server is not None and server.transport is not None:
-                server.transport.close()
+            if server is not None:
+                server.close()
 
     async def __aenter__(self) -> FakeTss:
         await self.start()
@@ -243,7 +284,17 @@ class FakeTss:
         while True:
             await asyncio.sleep(self.push_interval_s)
             if not self.silent:
-                self.push_now()
+                try:
+                    self.push_now()
+                except Exception:  # e.g. a test removed a key from state: keep pushing
+                    log.exception("fake TSS push failed")
+
+    def send_raw(self, data: bytes, device: int = codec.Device.DCU) -> None:
+        """Send any bytes to the subscriber of ``device`` (tests: corrupt packets)."""
+        addr = self.subscribers.get(device)
+        if addr is None:
+            raise RuntimeError(f"nobody is subscribed to device {device}")
+        self._reply(data, addr)
 
     def push_now(self) -> None:
         """Send one telemetry packet to every subscriber (the 1 Hz push, on demand)."""
@@ -273,6 +324,24 @@ class FakeTss:
         return None  # SPM/SSU/CTS/XRF: subscribable but not simulated yet
 
     # ---- legacy ports ----
+
+    def _on_legacy_datagram(self, data: bytes, addr: tuple[str, int]) -> None:
+        if self.legacy_service_s <= 0:
+            self._on_legacy(data, addr)
+            return
+        self._legacy_queue.append((data, addr))
+        self.legacy_max_queue = max(self.legacy_max_queue, len(self._legacy_queue))
+
+    async def _legacy_worker(self) -> None:
+        """Serve one queued legacy datagram per legacy_service_s, like the real TSS loop."""
+        while True:
+            await asyncio.sleep(self.legacy_service_s)
+            if self._legacy_queue:
+                data, addr = self._legacy_queue.popleft()
+                try:
+                    self._on_legacy(data, addr)
+                except Exception:
+                    log.exception("fake TSS failed on a legacy datagram")
 
     def _on_legacy(self, data: bytes, addr: tuple[str, int]) -> None:
         if self.silent:

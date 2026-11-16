@@ -18,9 +18,9 @@ from pydantic import BaseModel, ConfigDict, computed_field, model_validator
 
 CONTRACT_VERSION = 2
 
-# A section of data older than this is stale: about two missed 1 Hz pushes plus margin.
-# Used by the adapter (link status) and by core (value levels), so it lives here.
-STALE_AFTER_S = 2.5
+# No valid datagram on any path for this long: the TSS is unreachable. DCU/UIA push at 1 Hz and
+# the legacy port answers about every 1.2 s, so a healthy link is never quiet for 2.5 s.
+LINK_SILENT_AFTER_S = 2.5
 
 
 class _Model(BaseModel):
@@ -43,8 +43,8 @@ class LinkStatus(StrEnum):
 
     UNASSIGNED = "unassigned"  # the TSS answered Ack 1: assign our IP to a team in its web UI
     BAD_DATA = "bad_data"  # the newest datagram on some path could not be decoded
-    UNREACHABLE = "unreachable"  # nothing valid from any path within STALE_AFTER_S
-    STALE = "stale"  # some paths are fresh, at least one has gone quiet
+    UNREACHABLE = "unreachable"  # nothing valid from any path for LINK_SILENT_AFTER_S
+    STALE = "stale"  # the link works but some section is older than its STALE_AFTER_S
     OK = "ok"
 
 
@@ -53,7 +53,7 @@ class Level(StrEnum):
     CAUTION = "caution"
     WARNING = "warning"
     UNKNOWN = "unknown"  # no value, or not a number
-    STALE = "stale"  # last value is older than STALE_AFTER_S
+    STALE = "stale"  # last value is older than STALE_AFTER_S["telemetry"]
 
 
 class Mode(StrEnum):
@@ -94,6 +94,19 @@ class SuitFaults(_Model):
 
 Section = Literal["telemetry", "status", "faults", "dcu", "uia"]
 SECTIONS: tuple[Section, ...] = ("telemetry", "status", "faults", "dcu", "uia")
+
+# A section older than this is stale. Used by the adapter (link "stale") and by core (levels),
+# so it lives here. The limits follow how often each section can arrive from the real TSS
+# (docs/notes/tss-legacy-port-is-slow.md): DCU/UIA are pushed at 1 Hz; the legacy port answers
+# one request about every 1.2 s, so telemetry comes about every 1.2-2.4 s and status and
+# faults about every 7 s.
+STALE_AFTER_S: dict[Section, float] = {
+    "dcu": 2.5,
+    "uia": 2.5,
+    "telemetry": 4.0,
+    "status": 15.0,
+    "faults": 15.0,
+}
 
 
 class TssSnapshot(_Model):
