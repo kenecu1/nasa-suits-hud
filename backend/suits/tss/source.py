@@ -129,7 +129,13 @@ class TssSource:
             self._store("dcu", mapping.dcu_positions(codec.decode_dcu(packet.data)))
         elif packet.device == codec.Device.UIA:
             self._store("uia", mapping.uia_positions(codec.decode_uia(packet.data)))
-        # SPM/SSU/CTS/XRF are decoded by codec but not used before M7
+        else:
+            return  # SPM/SSU/CTS/XRF are decoded by codec but not used before M7
+        # The TSS pushes DCU/UIA only to an assigned team, so a valid push proves assignment
+        # even if a stray late Ack 1 arrived after the last Ack 0.
+        if self._unassigned:
+            self._unassigned = False
+            self._changed()
 
     def _on_legacy(self, section: Section, body: dict[str, Any]) -> None:
         if section == "telemetry":

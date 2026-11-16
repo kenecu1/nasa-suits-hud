@@ -181,6 +181,7 @@ async def test_unassigned_does_not_flicker_when_one_ack_is_lost():
         finally:
             await client.stop()
 
+    assert fake.drop_subscribes == 0  # the lost Subscribe really happened
     assert bool(source.snapshot().telemetry)  # the legacy path kept working
     assert set(seen) == {LinkStatus.UNASSIGNED}, sorted(set(seen))
 

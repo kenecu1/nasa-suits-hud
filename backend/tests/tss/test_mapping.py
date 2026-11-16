@@ -94,3 +94,22 @@ def test_telemetry_with_some_numbers_is_kept():
     source.feed("legacy/1", b'{"oxy_pri_storage": 92.0, "heart_rate": null}')
 
     assert source.snapshot().telemetry == {"oxy_pri_storage": 92.0, "heart_rate": None}
+
+
+def test_dcu_telemetry_proves_assignment_and_clears_unassigned():
+    # A stray late Ack 1 must not leave the link stuck on "unassigned": the TSS only pushes
+    # DCU/UIA telemetry to an assigned team.
+    source = TssSource()
+    source.feed("sub", codec.build_ack(0, codec.AckResult.UNASSIGNED))
+    assert source.snapshot().link == "unassigned"
+
+    source.feed("sub", bytes.fromhex("6af55d34001100010003000000000000e5"))
+
+    assert source.snapshot().link != "unassigned"
+
+
+def test_elapsed_s_is_none_when_telemetry_lacks_it():
+    source = TssSource()
+    source.feed("legacy/1", b'{"oxy_pri_storage": 92.0}')
+
+    assert source.snapshot().elapsed_s is None
