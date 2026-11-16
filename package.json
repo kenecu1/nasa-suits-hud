@@ -16,6 +16,7 @@
     "typecheck": "npm run typecheck --workspace client && tsc --noEmit -p e2e",
     "lint": "eslint . --max-warnings 0",
     "test:client": "npm run test --workspace client",
+    "tss:smoke": "node scripts/py.mjs scripts/tss_smoke.py",
     "e2e": "playwright test"
   },
   "devDependencies": {
