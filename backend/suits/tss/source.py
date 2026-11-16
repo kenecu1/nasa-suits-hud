@@ -1,0 +1,175 @@
+"""The TSS adapter's state: every inbound datagram goes through ``TssSource.feed``.
+
+Live transports (subscription.py, legacy.py) and the replayer (recorder.py) call the same
+``feed``, so a recording tests the real decoder. ``snapshot()`` turns what has arrived into a
+``TssSnapshot``, including the one link status (decision A in docs/briefs/M1.md).
+
+Channels name where a datagram came from:
+* ``"sub"``: the new protocol socket (port 14141)
+* ``"legacy/<command>"``: the legacy socket that sent GET <command> (replies carry no section name)
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
+from suits.contract import SECTIONS, STALE_AFTER_S, LinkStatus, Section, TssSnapshot
+from suits.tss import codec, mapping
+
+log = logging.getLogger(__name__)
+
+SUB_CHANNEL = "sub"
+LEGACY_COMMANDS: dict[codec.LegacyCommand, Section] = {
+    codec.LegacyCommand.TELEMETRY: "telemetry",
+    codec.LegacyCommand.STATUS: "status",
+    codec.LegacyCommand.ERROR: "faults",
+}
+
+
+def legacy_channel(command: int) -> str:
+    return f"legacy/{int(command)}"
+
+
+_CHANNEL_SECTION: dict[str, Section] = {legacy_channel(c): s for c, s in LEGACY_COMMANDS.items()}
+
+
+@dataclass
+class _Received:
+    value: Any
+    at: float  # clock() time
+
+
+@dataclass
+class _ChannelHealth:
+    last_ok: bool
+    at: float
+
+
+class TssSource:
+    """Holds the newest value of each section and when it arrived. Not thread-safe; one loop."""
+
+    def __init__(
+        self,
+        clock: Callable[[], float] = time.monotonic,
+        wall: Callable[[], float] = time.time,
+        on_change: Callable[[], None] | None = None,
+    ) -> None:
+        self._clock = clock
+        self._wall = wall
+        self.on_change = on_change
+        self._sections: dict[Section, _Received] = {}
+        self._channels: dict[str, _ChannelHealth] = {}
+        self._unassigned_at: float | None = None
+        self.decode_errors = 0
+        self.last_error: str | None = None
+
+    # ---- inbound ----
+
+    def feed(self, channel: str, datagram: bytes) -> codec.Packet | None:
+        """Decode one inbound datagram and update state. Never raises on bad data.
+
+        Returns the decoded packet for the ``sub`` channel (so the subscription can see Acks),
+        otherwise None.
+        """
+        try:
+            if channel == SUB_CHANNEL:
+                packet = codec.decode(datagram)
+                self._on_packet(packet)
+                result = packet
+            elif channel in _CHANNEL_SECTION:
+                self._on_legacy(_CHANNEL_SECTION[channel], codec.parse_legacy_reply(datagram))
+                result = None
+            else:
+                raise codec.CodecError(f"unknown channel {channel!r}")
+        except codec.CodecError as exc:
+            self._mark(channel, ok=False)
+            self.decode_errors += 1
+            self.last_error = f"{channel}: {exc}"
+            log.warning("bad TSS datagram on %s: %s (%d bytes)", channel, exc, len(datagram))
+            self._changed()
+            return None
+        self._mark(channel, ok=True)
+        return result
+
+    def _on_packet(self, packet: codec.Packet) -> None:
+        if packet.code == codec.Code.ACK:
+            result = codec.parse_ack(packet)
+            was = self._unassigned_at is not None
+            self._unassigned_at = self._clock() if result == codec.AckResult.UNASSIGNED else None
+            if was != (self._unassigned_at is not None):
+                self._changed()
+            return
+        if packet.code != codec.Code.TELEMETRY:
+            return  # the server never sends Subscribe/Unsubscribe to us; ignore
+        if packet.device == codec.Device.DCU:
+            self._store("dcu", mapping.dcu_positions(codec.decode_dcu(packet.data)))
+        elif packet.device == codec.Device.UIA:
+            self._store("uia", mapping.uia_positions(codec.decode_uia(packet.data)))
+        # SPM/SSU/CTS/XRF are decoded by codec but not used before M7
+
+    def _on_legacy(self, section: Section, body: dict[str, Any]) -> None:
+        if section == "telemetry":
+            self._store(section, mapping.telemetry_values(body))
+        elif section == "status":
+            self._store(section, mapping.eva_started(body))
+        elif section == "faults":
+            self._store(section, mapping.suit_faults(body))
+
+    def _store(self, section: Section, value: Any) -> None:
+        previous = self._sections.get(section)
+        self._sections[section] = _Received(value, self._clock())
+        if previous is None or previous.value != value:
+            self._changed()
+
+    def _mark(self, channel: str, ok: bool) -> None:
+        previous = self._channels.get(channel)
+        self._channels[channel] = _ChannelHealth(ok, self._clock())
+        if previous is not None and previous.last_ok != ok:
+            self._changed()
+
+    def _changed(self) -> None:
+        if self.on_change is not None:
+            self.on_change()
+
+    # ---- outbound ----
+
+    def snapshot(self) -> TssSnapshot:
+        now = self._clock()
+        ages: dict[Section, float] = {
+            s: round(now - r.at, 3) for s, r in self._sections.items() if s in SECTIONS
+        }
+        return TssSnapshot(
+            t=self._wall(),
+            link=self._link(now, ages),
+            ages=ages,
+            telemetry=self._value("telemetry", dict),
+            started=self._value("status", None),
+            faults=self._value("faults", None),
+            dcu=self._value("dcu", None),
+            uia=self._value("uia", None),
+        )
+
+    def _value(self, section: Section, default_factory: Callable[[], Any] | None) -> Any:
+        received = self._sections.get(section)
+        if received is not None:
+            return received.value
+        return default_factory() if default_factory else None
+
+    def _link(self, now: float, ages: dict[Section, float]) -> LinkStatus:
+        def recent(at: float) -> bool:
+            return now - at <= STALE_AFTER_S
+
+        if self._unassigned_at is not None and recent(self._unassigned_at):
+            return LinkStatus.UNASSIGNED
+        if any(not h.last_ok and recent(h.at) for h in self._channels.values()):
+            return LinkStatus.BAD_DATA
+        fresh = [s for s in SECTIONS if s in ages and ages[s] <= STALE_AFTER_S]
+        if not fresh:
+            return LinkStatus.UNREACHABLE
+        if len(fresh) < len(SECTIONS):
+            return LinkStatus.STALE
+        return LinkStatus.OK
