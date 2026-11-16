@@ -105,3 +105,34 @@ async def test_a_new_subscriber_gets_the_latest_state_at_once():
     queue = publisher.subscribe()
 
     assert queue.get_nowait().seq == 1
+
+
+async def test_an_error_while_publishing_does_not_end_the_loop():
+    store = Store(Mode.SIM)
+    real_commit = store.commit
+    calls = []
+
+    def commit_fails_once(state):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("a bug")
+        return real_commit(state)
+
+    store.commit = commit_fails_once
+    publisher = Publisher(FakeSource().snapshot, store, heartbeat_s=0.05)
+    queue = publisher.subscribe()
+
+    async with running(publisher):
+        await asyncio.sleep(0.3)
+
+    assert len(drain(queue)) >= 2  # it kept beating after the failure
+
+
+async def test_a_new_subscriber_is_not_handed_an_old_state():
+    publisher = Publisher(FakeSource().snapshot, Store(Mode.SIM), heartbeat_s=1.0)
+    publisher.publish(force=True)
+    publisher._latest_at -= 10  # the loop has been stuck for 10 s
+
+    queue = publisher.subscribe()
+
+    assert queue.empty()

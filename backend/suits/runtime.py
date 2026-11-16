@@ -79,7 +79,10 @@ async def start_runtime(settings: Settings) -> Runtime:
     try:
         await _start(runtime, settings)
     except BaseException:
-        await runtime.stop()  # nothing half-started is left open
+        try:
+            await runtime.stop()  # nothing half-started is left open
+        except Exception:
+            log.exception("cleanup after a failed start also failed")  # keep the real reason
         raise
     return runtime
 

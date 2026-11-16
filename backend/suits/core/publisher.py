@@ -50,7 +50,10 @@ class Publisher:
 
     def subscribe(self) -> asyncio.Queue[State]:
         queue: asyncio.Queue[State] = asyncio.Queue(maxsize=QUEUE_SIZE)
-        if self.latest is not None:
+        age = self.seconds_since_publish()
+        # A State older than a few heartbeats means the loop is stuck: do not hand it out as
+        # if it were current (a new client would show a frozen "ok").
+        if self.latest is not None and age is not None and age <= 3 * self.heartbeat_s:
             queue.put_nowait(self.latest)
         self._queues.add(queue)
         return queue
@@ -86,13 +89,19 @@ class Publisher:
                     next_beat = time.monotonic() + self.heartbeat_s
 
     def publish(self, force: bool = False) -> State | None:
-        """Build State; send it if forced (heartbeat) or if its content changed."""
+        """Build State; send it if forced (heartbeat) or if its content changed.
+
+        Never raises: one bad snapshot or bug must not end the heartbeat loop. The log says
+        what happened, and /health turns "degraded" if no State goes out for 3 s.
+        """
         try:
-            state = self._store.preview(self._snapshot())
+            return self._publish(force)
         except Exception:
-            # Never let one bad snapshot stop the heartbeat; the log says what happened.
-            log.exception("could not build state")
+            log.exception("could not build or send state")
             return None
+
+    def _publish(self, force: bool) -> State | None:
+        state = self._store.preview(self._snapshot())
         key = content_key(state)
         if not force and key == self._last_key:
             return None

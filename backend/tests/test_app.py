@@ -189,3 +189,63 @@ def test_health_is_degraded_when_no_state_was_sent_for_too_long(client):
 
     assert body["status"] == "degraded"
     assert body["dead_tasks"] == []
+
+
+def test_health_names_a_dead_link_task(client):
+    from suits.tasks import spawn
+
+    runtime = client.app.state.runtime
+
+    async def boom():
+        raise RuntimeError("boom")
+
+    def kill_link():
+        runtime.client._tasks.append(spawn(boom(), "tss-broken"))
+
+    client.portal.call(kill_link)
+    deadline = time.monotonic() + 2
+    while not runtime.client._tasks[-1].done() and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+    body = client.get("/health").json()
+
+    assert body["status"] == "degraded"
+    assert body["dead_tasks"] == ["tss-broken"]
+
+
+def test_health_is_degraded_before_the_first_state():
+    import asyncio
+
+    from suits.core.publisher import Publisher
+    from suits.core.store import Store
+    from suits.runtime import Runtime
+    from suits.tss.source import TssSource
+
+    source = TssSource()
+    app = create_app(Settings(mode=Mode.SIM))
+    app.state.runtime = Runtime(Settings(mode=Mode.SIM), source,
+                                Publisher(source.snapshot, Store(Mode.SIM)))
+    route = next(r for r in app.routes if getattr(r, "path", "") == "/health")
+
+    body = asyncio.run(route.endpoint())
+
+    assert body["status"] == "degraded"
+    assert body["seq"] is None
+
+
+def test_a_failing_cleanup_does_not_hide_why_startup_failed(monkeypatch):
+    import suits.runtime as runtime_module
+
+    def broken_client(*args, **kwargs):
+        raise OSError("the real reason")
+
+    async def stop_also_fails(self):
+        raise RuntimeError("cleanup failed too")
+
+    monkeypatch.setattr(runtime_module, "TssClient", broken_client)
+    monkeypatch.setattr(runtime_module.Runtime, "stop", stop_also_fails)
+
+    with pytest.raises(OSError, match="the real reason"), TestClient(
+        create_app(Settings(mode=Mode.SIM))
+    ):
+        pass
