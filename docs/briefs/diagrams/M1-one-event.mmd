@@ -1,0 +1,28 @@
+sequenceDiagram
+  participant T as TSS (fake or real)
+  participant L as tss/legacy.py
+  participant S as tss/subscription.py + codec.py
+  participant M as tss/mapping.py
+  participant C as core/store + levels
+  participant A as app.py /ws
+  participant N as client net + store
+  participant V as hud/o2.vm.ts
+  participant P as scene panel
+
+  Note over S,T: at startup
+  S->>T: Subscribe DCU (13 bytes), resend until Ack
+  T-->>S: Ack 0 (or 1 = unassigned)
+  loop every second
+    L->>T: [timestamp, command 1] (8 bytes)
+    T-->>L: JSON {"telemetry": {... "oxy_pri_storage": 15 ...}}
+    T-->>S: DCU telemetry packet, oxy flag = 1
+  end
+  L->>M: raw telemetry dict
+  S->>M: decoded DCU flags
+  M->>C: TssSnapshot (oxy flag 1 → "PRI")
+  C->>C: levels: 15 is below range → "warning"
+  C->>A: new State, changed
+  A->>N: state JSON (full, v 2)
+  N->>V: store updated
+  V->>P: {text:"15%", level:"warning", style: red / triangle / "WARN"}
+  V-->>N: also on window.__hud for tests

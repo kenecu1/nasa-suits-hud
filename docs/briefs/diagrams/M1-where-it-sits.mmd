@@ -1,0 +1,33 @@
+flowchart LR
+  TSS[(NASA TSS<br/>or fake TSS)]
+  subgraph backend [backend: Python on the laptop]
+    direction LR
+    SUB[tss/subscription + codec<br/>binary, port 14141<br/>DCU, UIA]
+    LEG[tss/legacy<br/>JSON, port 14142+team<br/>telemetry, status, faults]
+    MAP[tss/mapping<br/>raw → TssSnapshot]
+    REC[tss/recorder<br/>raw datagrams]
+    CORE[core/store + levels<br/>→ State]
+    APP[app.py /ws<br/>full state 1 Hz + on change]
+    LATER1[core alerts, procedures, nav<br/>ml, voice]:::later
+  end
+  subgraph client [client: browser / headset]
+    direction LR
+    NET[net/ WebSocket<br/>+ reconnect]
+    STORE[zustand store]
+    VM[hud/o2.vm.ts<br/>state → view model]
+    SCENE[scene/ rig + panel<br/>WebGL, theme.ts]
+    HOOK[window.__hud]
+    INPUT[input/ intents → command]:::later
+  end
+  TSS <--> SUB
+  TSS <--> LEG
+  SUB --> MAP
+  LEG --> MAP
+  SUB -.-> REC
+  LEG -.-> REC
+  MAP --> CORE --> APP --> NET --> STORE --> VM --> SCENE
+  VM --> HOOK
+  INPUT -.-> APP
+  class SUB,LEG,MAP,REC,CORE,APP,NET,STORE,VM,SCENE,HOOK new
+  classDef new fill:#2d6,color:#000
+  classDef later fill:#ddd,color:#666,stroke-dasharray: 4 3

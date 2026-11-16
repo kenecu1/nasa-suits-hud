@@ -22,7 +22,7 @@ Build in this order. After M2 there are two tracks that can run in parallel sess
 
 | # | Milestone | Needs | Builder | Fable review | Status |
 |---|---|---|---|---|---|
-| M1 | [Walking skeleton](milestones/M1-walking-skeleton.md): TSS → HUD panel on laptop and emulated headset | — | Opus 5.5 | **Yes, after** | built (sessions 1 and 2), not yet accepted. Open: end-of-session reviews, review in a fresh Opus chat, `npm run tss:smoke` against a real TSS. See [walkthrough](../walkthroughs/M1.md) |
+| M1 | [Walking skeleton](milestones/M1-walking-skeleton.md): TSS → HUD panel on laptop and emulated headset | — | Opus 5.5 | **Yes, after** | built (sessions 1 and 2), all acceptance items pass, helper reviews done. Open: review in a fresh Opus chat, then acceptance. See [walkthrough](../walkthroughs/M1.md) |
 | M2 | [Telemetry, caution and warning, low-light design](milestones/M2-telemetry-alerts.md) | M1 | Opus 5.5 | no | not started |
 | M3 | [Procedures: egress and ingress](milestones/M3-procedures.md) (track A) | M2 | Opus 5.5 | no | not started |
 | M4 | [Navigation](milestones/M4-navigation.md) (track A) | M3 | Opus 5.5 | no | not started |
