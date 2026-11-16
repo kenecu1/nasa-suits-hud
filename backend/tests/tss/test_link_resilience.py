@@ -152,3 +152,52 @@ async def test_a_late_ack_is_not_thrown_away():
 def test_subscribe_retries_after_one_second_by_default():
     # the real TSS takes up to about a second to answer (tss-legacy-port-is-slow)
     assert Subscription(TssSource(), "127.0.0.1").retry_s == 1.0
+
+
+async def sample_links(source: TssSource, seconds: float) -> list[str]:
+    seen = []
+    end = asyncio.get_running_loop().time() + seconds
+    while asyncio.get_running_loop().time() < end:
+        seen.append(source.snapshot().link)
+        await asyncio.sleep(0.02)
+    return seen
+
+
+async def test_unassigned_does_not_flicker_when_one_ack_is_lost():
+    # Against the real TSS an Ack takes up to ~1 s. Ack 1 -> wait 1 s -> Subscribe lost ->
+    # 1 s retry -> late Ack: more than 2.5 s between two Ack 1s, while legacy data still flows.
+    async with FakeTss() as fake:
+        fake.ack_result = codec.AckResult.UNASSIGNED
+        fake.ack_delay_s = 0.8
+        source = TssSource()
+        client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
+        client.start()
+        try:
+            await wait_until(lambda: source.snapshot().link == LinkStatus.UNASSIGNED, within=3)
+            fake.drop_subscribes = 1
+
+            seen = await sample_links(source, 5)
+        finally:
+            await client.stop()
+
+    assert bool(source.snapshot().telemetry)  # the legacy path kept working
+    assert set(seen) == {LinkStatus.UNASSIGNED}, sorted(set(seen))
+
+
+async def test_an_unassigned_tss_that_goes_silent_becomes_unreachable_within_3_s():
+    async with FakeTss() as fake:
+        fake.ack_result = codec.AckResult.UNASSIGNED
+        source = TssSource()
+        client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
+        client.start()
+        try:
+            await wait_until(lambda: source.snapshot().link == LinkStatus.UNASSIGNED, within=3)
+            fake.silent = True
+
+            waited = await wait_until(
+                lambda: source.snapshot().link == LinkStatus.UNREACHABLE, within=3
+            )
+        finally:
+            await client.stop()
+
+    assert waited <= 3

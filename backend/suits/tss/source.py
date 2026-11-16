@@ -70,7 +70,8 @@ class TssSource:
         self.on_change = on_change
         self._sections: dict[Section, _Received] = {}
         self._channels: dict[str, _ChannelHealth] = {}
-        self._unassigned_at: float | None = None
+        # Set by Ack 1, cleared only by Ack 0: a lost Ack must not make the link flicker.
+        self._unassigned = False
         self._last_valid_at: float | None = None  # any datagram that decoded, Acks included
         self.decode_errors = 0
         self.last_error: str | None = None
@@ -114,9 +115,12 @@ class TssSource:
     def _on_packet(self, packet: codec.Packet) -> None:
         if packet.code == codec.Code.ACK:
             result = codec.parse_ack(packet)
-            was = self._unassigned_at is not None
-            self._unassigned_at = self._clock() if result == codec.AckResult.UNASSIGNED else None
-            if was != (self._unassigned_at is not None):
+            was = self._unassigned
+            if result == codec.AckResult.UNASSIGNED:
+                self._unassigned = True
+            elif result == codec.AckResult.OK:
+                self._unassigned = False
+            if was != self._unassigned:
                 self._changed()
             return
         if packet.code != codec.Code.TELEMETRY:
@@ -182,7 +186,8 @@ class TssSource:
         def recent(at: float | None) -> bool:
             return at is not None and now - at <= LINK_SILENT_AFTER_S
 
-        if recent(self._unassigned_at):
+        # unassigned holds until Ack 0, but only while the TSS is heard at all
+        if self._unassigned and recent(self._last_valid_at):
             return LinkStatus.UNASSIGNED
         if any(not h.last_ok and recent(h.at) for h in self._channels.values()):
             return LinkStatus.BAD_DATA
