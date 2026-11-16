@@ -177,6 +177,10 @@ def json_schema() -> dict:
         schema = model.model_json_schema(mode="serialization", ref_template="#/$defs/{model}")
         defs.update(schema.pop("$defs", {}))
         defs[model.__name__] = schema
+    for definition in defs.values():
+        for prop in definition.get("properties", {}).values():
+            # Pydantic titles every field; the TS generator would make an alias for each one.
+            prop.pop("title", None)
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "SuitsContract",
