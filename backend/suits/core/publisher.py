@@ -39,6 +39,7 @@ class Publisher:
         self._changed = asyncio.Event()
         self._queues: set[asyncio.Queue[State]] = set()
         self._last_key: str | None = None
+        self._latest_at: float | None = None  # monotonic time of the last send
         self.latest: State | None = None
 
     # ---- inputs ----
@@ -60,6 +61,10 @@ class Publisher:
     @property
     def subscriber_count(self) -> int:
         return len(self._queues)
+
+    def seconds_since_publish(self) -> float | None:
+        """None before the first send. More than a heartbeat or two means the loop is stuck."""
+        return None if self._latest_at is None else time.monotonic() - self._latest_at
 
     # ---- loop ----
 
@@ -94,6 +99,7 @@ class Publisher:
         self._store.commit(state)
         self._last_key = key
         self.latest = state
+        self._latest_at = time.monotonic()
         for queue in self._queues:
             _put_latest(queue, state)
         return state

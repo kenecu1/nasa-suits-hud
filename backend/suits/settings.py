@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -41,6 +42,8 @@ class Settings:
             speed = float(env.get("SUITS_REPLAY_SPEED", "1"))
         except ValueError as exc:
             raise SettingsError(f"bad number in settings: {exc}") from None
+        if not (math.isfinite(speed) and speed > 0):
+            raise SettingsError(f"SUITS_REPLAY_SPEED must be a positive number, got {speed}")
         if not 0 <= team <= 9:
             raise SettingsError(f"TSS_TEAM must be 0-9, got {team}")
         return cls(

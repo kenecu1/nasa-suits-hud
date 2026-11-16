@@ -106,16 +106,16 @@ def decode(datagram: bytes) -> Packet:
     """Check size, length field and checksum, then split into a Packet. Raises CodecError."""
     if len(datagram) < MIN_PACKET_SIZE:
         raise PacketTooShort(f"{len(datagram)} bytes, need at least {MIN_PACKET_SIZE}")
-    timestamp, length, device, code = HEADER.unpack_from(datagram)
+    timestamp, length, device, raw_code = HEADER.unpack_from(datagram)
     if length != len(datagram):
         raise LengthMismatch(f"length field says {length}, datagram has {len(datagram)} bytes")
     expected = checksum(datagram[:-1])
     if datagram[-1] != expected:
         raise BadChecksum(f"checksum {datagram[-1]:#04x}, expected {expected:#04x}")
     try:
-        code = Code(code)
+        code = Code(raw_code)
     except ValueError as exc:
-        raise UnknownCode(f"message code {code}") from exc
+        raise UnknownCode(f"message code {raw_code}") from exc
     return Packet(timestamp, device, code, bytes(datagram[HEADER_SIZE:-1]))
 
 
@@ -295,7 +295,7 @@ def parse_legacy_reply(datagram: bytes) -> dict:
     """A GET reply: the JSON object of one EVA.json section. Raises BadJson."""
     try:
         value = json.loads(datagram.rstrip(b"\x00").decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:  # JSONDecodeError is a ValueError
         raise BadJson(f"legacy reply is not JSON: {exc}") from exc
     if not isinstance(value, dict):
         raise BadJson(f"legacy reply is {type(value).__name__}, expected an object")

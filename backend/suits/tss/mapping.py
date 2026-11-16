@@ -70,9 +70,18 @@ def telemetry_values(section: dict[str, Any]) -> dict[str, float | None]:
         raise BadField("telemetry section is empty")
     values: dict[str, float | None] = {}
     for name, raw in section.items():
-        is_number = isinstance(raw, (int, float)) and not isinstance(raw, bool)
-        values[name] = float(raw) if is_number and math.isfinite(raw) else None
+        values[name] = _finite(raw)
     return values
+
+
+def _finite(raw: Any) -> float | None:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    try:
+        value = float(raw)
+    except OverflowError:  # an int too big for a float
+        return None
+    return value if math.isfinite(value) else None
 
 
 def eva_started(section: dict[str, Any]) -> bool:

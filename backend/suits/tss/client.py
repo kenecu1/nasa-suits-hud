@@ -7,9 +7,9 @@ never imports codec, subscription or legacy (enforced by tests/test_import_bound
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from dataclasses import dataclass
 
+from suits.tasks import cancel_all, spawn
 from suits.tss.legacy import LegacyPoller
 from suits.tss.source import TssSource
 from suits.tss.subscription import Subscription
@@ -40,16 +40,16 @@ class TssClient:
         self.legacy = LegacyPoller(source, address.host, address.legacy_port, tap)
         self._tasks: list[asyncio.Task] = []
 
+    @property
+    def tasks(self) -> list[asyncio.Task]:
+        return list(self._tasks)
+
     def start(self) -> None:
         self._tasks = [
-            asyncio.create_task(self.subscription.run(), name="tss-subscription"),
-            asyncio.create_task(self.legacy.run(), name="tss-legacy"),
+            spawn(self.subscription.run(), "tss-subscription"),
+            spawn(self.legacy.run(), "tss-legacy"),
         ]
 
     async def stop(self) -> None:
-        for task in self._tasks:
-            task.cancel()
-        for task in self._tasks:
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        await cancel_all(self._tasks)
         self._tasks = []

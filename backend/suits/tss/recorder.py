@@ -14,8 +14,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Literal
@@ -43,7 +44,7 @@ class Datagram:
 class Recorder:
     """A ``Tap`` that appends every datagram to a JSONL file."""
 
-    def __init__(self, path: Path, wall=time.time) -> None:
+    def __init__(self, path: Path, wall: Callable[[], float] = time.time) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self._wall = wall
@@ -114,8 +115,8 @@ class Replayer:
     """
 
     def __init__(self, path: Path, speed: float = 1.0) -> None:
-        if speed <= 0:
-            raise ValueError("speed must be positive")
+        if not (math.isfinite(speed) and speed > 0):
+            raise ValueError(f"speed must be a positive number, got {speed}")
         self.path = path
         self.speed = speed
         self.datagrams = [d for d in read_recording(path) if d.dir == "in"]

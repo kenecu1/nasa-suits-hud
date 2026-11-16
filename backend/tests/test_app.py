@@ -1,6 +1,7 @@
 """Acceptance 9: the app in sim mode, over a real WebSocket, against the built-in fake TSS."""
 
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -77,11 +78,63 @@ def test_states_keep_coming_once_a_second_with_rising_seq(client):
     assert seqs == sorted(seqs) and len(set(seqs)) == 4
 
 
-def test_health(client):
-    body = client.get("/health").json()
+def test_health_reports_mode_link_and_clients(client):
+    with client.websocket_connect("/ws") as ws:
+        receive_until(ws, lambda m: m["link"]["tss"] == "ok", timeout=5)
+        body = client.get("/health").json()
 
     assert body["status"] == "ok"
     assert body["mode"] == "sim"
+    assert body["tss"] == "ok"
+    assert body["clients"] == 1
+    assert body["seq"] >= 1
+    assert body["dead_tasks"] == []
+
+
+def test_a_closed_client_is_forgotten_at_once(client):
+    publisher = client.app.state.runtime.publisher
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        assert publisher.subscriber_count == 1
+
+    deadline = time.monotonic() + 0.5  # well under one heartbeat
+    while publisher.subscriber_count and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert publisher.subscriber_count == 0
+
+
+def test_replay_mode_serves_the_recording():
+    recording = Path(__file__).parent / "fixtures" / "captured-tss.jsonl"
+    settings = Settings(mode=Mode.REPLAY, recording=recording, replay_speed=4.0)
+    with TestClient(create_app(settings)) as c, c.websocket_connect("/ws") as ws:
+        msg, _ = receive_until(ws, lambda m: bool(m["dcu"]) and m["dcu"]["oxy"] == "PRI", 5)
+
+    assert msg["link"]["mode"] == "replay"
+    assert o2(msg)["unit"] == "%"
+
+
+def test_a_failed_start_leaves_nothing_open(monkeypatch):
+    import suits.runtime as runtime_module
+
+    started: list = []
+
+    class TrackedFake(runtime_module.FakeTss):
+        async def start(self):
+            await super().start()
+            started.append(self)
+
+    def broken_client(*args, **kwargs):
+        raise OSError("no network")
+
+    monkeypatch.setattr(runtime_module, "FakeTss", TrackedFake)
+    monkeypatch.setattr(runtime_module, "TssClient", broken_client)
+
+    with pytest.raises(OSError), TestClient(create_app(Settings(mode=Mode.SIM))):
+        pass
+
+    assert len(started) == 1
+    transport = started[0]._sub.transport
+    assert transport is None or transport.is_closing()
 
 
 @pytest.mark.parametrize(
