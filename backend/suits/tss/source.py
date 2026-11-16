@@ -163,6 +163,7 @@ class TssSource:
             link=self._link(now, ages),
             ages=ages,
             telemetry=self._value("telemetry", dict),
+            elapsed_s=mapping.elapsed_seconds(self._value("telemetry", dict)),
             started=self._value("status", None),
             faults=self._value("faults", None),
             dcu=self._value("dcu", None),

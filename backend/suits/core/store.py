@@ -23,8 +23,6 @@ from suits.contract import (
 )
 from suits.core.levels import classify, load_ranges
 
-ELAPSED = "eva_elapsed_time"
-
 
 def _fresh(snapshot: TssSnapshot, section: Section) -> bool:
     age = snapshot.ages.get(section)
@@ -57,14 +55,13 @@ def build_state(
     snapshot: TssSnapshot, ranges: dict[str, Any], mode: Mode, seq: int
 ) -> State:
     values = suit_values(snapshot, ranges)
-    elapsed = values.get(ELAPSED)
     return State(
         seq=seq,
         t=snapshot.t,
         link=Link(tss=snapshot.link, age_s=snapshot.age_s, mode=mode),
         eva=Eva(
             started=snapshot.started if _fresh(snapshot, "status") else None,
-            elapsed_s=elapsed.value if elapsed and elapsed.level != Level.STALE else None,
+            elapsed_s=snapshot.elapsed_s if _fresh(snapshot, "telemetry") else None,
             phase=None,
         ),
         suit=Suit(

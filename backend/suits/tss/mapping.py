@@ -84,6 +84,14 @@ def _finite(raw: Any) -> float | None:
     return value if math.isfinite(value) else None
 
 
+ELAPSED_FIELD = "eva_elapsed_time"
+
+
+def elapsed_seconds(telemetry: dict[str, float | None]) -> float | None:
+    """EVA elapsed time from a mapped telemetry section."""
+    return telemetry.get(ELAPSED_FIELD)
+
+
 def eva_started(section: dict[str, Any]) -> bool:
     """Legacy GET 2."""
     started = section.get("started")

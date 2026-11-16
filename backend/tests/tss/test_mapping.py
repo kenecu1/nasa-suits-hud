@@ -62,3 +62,10 @@ def test_absurd_legacy_replies_are_bad_data_not_a_crash(reply):
     assert source.feed("legacy/1", reply) is None
     assert source.decode_errors == 1
     assert source.snapshot().link == "bad_data"
+
+
+def test_the_snapshot_carries_elapsed_seconds_from_telemetry():
+    source = TssSource()
+    source.feed("legacy/1", b'{"oxy_pri_storage": 92.0, "eva_elapsed_time": 600}')
+
+    assert source.snapshot().elapsed_s == 600.0

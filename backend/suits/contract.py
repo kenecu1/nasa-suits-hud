@@ -120,6 +120,7 @@ class TssSnapshot(_Model):
     link: LinkStatus
     ages: dict[Section, float]  # seconds since each section last arrived; absent = never
     telemetry: dict[str, float | None]  # TSS names; None = present but not a finite number
+    elapsed_s: float | None = None  # EVA elapsed time from telemetry, so core needs no TSS name
     started: bool | None
     faults: SuitFaults | None
     dcu: DcuPositions | None

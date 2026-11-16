@@ -83,7 +83,7 @@ def test_before_the_eva_starts_nothing_is_flagged():
 
 
 def test_elapsed_time_is_reported_and_has_no_range():
-    s = state(snapshot({"eva_elapsed_time": 312.0}))
+    s = state(snapshot({"eva_elapsed_time": 312.0}, elapsed_s=312.0))
 
     assert s.eva.elapsed_s == 312.0
     assert s.suit.values["eva_elapsed_time"].unit == "s"
@@ -130,3 +130,15 @@ def test_a_fresh_not_started_does_silence_alarms():
     s = state(snapshot({"oxy_pri_storage": 15.0}, started=False))
 
     assert s.suit.values["oxy_pri_storage"].level == Level.NOMINAL
+
+
+def test_elapsed_time_comes_from_the_snapshot_not_a_tss_name():
+    s = state(snapshot({"oxy_pri_storage": 92.0}, elapsed_s=312.0))
+
+    assert s.eva.elapsed_s == 312.0
+
+
+def test_elapsed_time_is_unknown_when_telemetry_is_stale():
+    s = state(snapshot({}, elapsed_s=312.0, age=max(STALE_AFTER_S.values()) + 0.1))
+
+    assert s.eva.elapsed_s is None

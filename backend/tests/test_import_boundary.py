@@ -63,3 +63,27 @@ def test_tss_and_sim_are_allowed():
     allowed = [SUITS / "tss" / "client.py", SUITS / "sim" / "fake_tss.py"]
 
     assert violations(allowed) == []
+
+
+def tss_names() -> set[str]:
+    """Every TSS telemetry name: data/ranges.json lists them all."""
+    from suits.core.levels import load_ranges
+
+    ranges = load_ranges()
+    return set(ranges["ranges"]) | set(ranges["unranged"])
+
+
+def string_constants(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+
+
+def test_no_tss_field_name_is_written_outside_tss_and_sim():
+    names = tss_names()
+    bad = [
+        f"{path.name}: {sorted(string_constants(path) & names)}"
+        for path in CHECKED
+        if not any(path.is_relative_to(d) for d in ALLOWED_DIRS) and string_constants(path) & names
+    ]
+
+    assert bad == []
