@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 
 T, S, E = codec.LegacyCommand.TELEMETRY, codec.LegacyCommand.STATUS, codec.LegacyCommand.ERROR
 SCHEDULE: tuple[codec.LegacyCommand, ...] = (T, T, S, T, T, E)
+SILENT_AFTER = 3  # unanswered requests in a row before a warning
 
 
 class LegacyPoller:
@@ -54,6 +55,7 @@ class LegacyPoller:
         self._waiting_for: codec.LegacyCommand | None = None
         self._replied = asyncio.Event()
         self.timeouts = 0
+        self._unanswered = 0  # requests in a row with no reply at all
 
     async def run(self) -> None:
         """Run until cancelled. Reopens sockets that close; never stops on a socket error."""
@@ -68,7 +70,11 @@ class LegacyPoller:
                     continue
                 command = SCHEDULE[turn % len(SCHEDULE)]
                 turn += 1
-                await self._request(command)
+                try:
+                    await self._request(command)
+                except Exception:  # never let one bad turn end the only poll loop
+                    log.exception("legacy poll of command %d failed", command)
+                    await asyncio.sleep(self.reopen_after_s)
         finally:
             for endpoint in self._endpoints.values():
                 endpoint.close()
@@ -77,13 +83,37 @@ class LegacyPoller:
         started = time.monotonic()
         self._waiting_for = command
         self._replied.clear()
+        answered = False
         if self._endpoints[command].send(codec.build_legacy_get(int(self._timestamp()), command)):
-            try:
-                await asyncio.wait_for(self._replied.wait(), self.reply_timeout_s)
-            except TimeoutError:
+            answered = await self._reply_within(self.reply_timeout_s)
+            if not answered:
                 self.timeouts += 1
+                # The reply may still be on its way. Send nothing new until it has had one more
+                # window, or it would be taken as the answer to the next request and two
+                # requests would sit in the TSS queue (docs/notes/tss-legacy-port-is-slow.md).
+                answered = await self._reply_within(self.reply_timeout_s)
         self._waiting_for = None
+        self._track(answered)
         await asyncio.sleep(max(0.0, self.min_gap_s - (time.monotonic() - started)))
+
+    async def _reply_within(self, seconds: float) -> bool:
+        try:
+            await asyncio.wait_for(self._replied.wait(), seconds)
+        except TimeoutError:
+            return False
+        return True
+
+    def _track(self, answered: bool) -> None:
+        """Say once when the port stops answering, and once when it answers again."""
+        if answered:
+            if self._unanswered >= SILENT_AFTER:
+                log.info("TSS legacy port %s:%d is answering again", *self._remote)
+            self._unanswered = 0
+            return
+        self._unanswered += 1
+        if self._unanswered == SILENT_AFTER:
+            log.warning("no reply from the TSS legacy port %s:%d to %d requests in a row "
+                        "(TSS down, or wrong TSS_TEAM?)", *self._remote, SILENT_AFTER)
 
     async def _open_missing(self) -> None:
         for command in LEGACY_COMMANDS:

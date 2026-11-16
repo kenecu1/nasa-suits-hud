@@ -1,6 +1,7 @@
 """Link behaviour learned from the real TSS and from review: throughput, dead sockets, bad bytes."""
 
 import asyncio
+import logging
 import socket
 
 from suits.contract import STALE_AFTER_S, LinkStatus
@@ -201,3 +202,72 @@ async def test_an_unassigned_tss_that_goes_silent_becomes_unreachable_within_3_s
             await client.stop()
 
     assert waited <= 3
+
+
+async def test_a_reply_later_than_the_timeout_does_not_let_requests_pile_up():
+    # A late reply must not count as the answer to the next request on that socket,
+    # or one more request is in flight after every timeout.
+    async with FakeTss(legacy_service_s=0.5) as fake:
+        source = TssSource()
+        client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
+        client.legacy.reply_timeout_s = 0.3
+        client.start()
+        try:
+            await asyncio.sleep(4)
+        finally:
+            await client.stop()
+
+    assert fake.legacy_max_queue <= 1
+    assert len(fake.legacy_gets) >= 4  # it kept polling
+
+
+async def test_a_tss_that_never_answers_is_reported_once(caplog):
+    caplog.set_level(logging.INFO, logger="suits")
+    async with FakeTss() as fake:
+        fake.silent = True
+        source = TssSource()
+        client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
+        client.legacy.reply_timeout_s = 0.2
+        client.subscription.retry_s = 0.2
+        client.start()
+        try:
+            await asyncio.sleep(3)
+            fake.silent = False
+            await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=5)
+        finally:
+            await client.stop()
+
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    legacy = [m for m in warnings if "legacy" in m and str(fake.legacy_port) in m]
+    subscribe = [m for m in warnings if "Subscribe" in m and str(fake.sub_port) in m]
+    assert len(legacy) == 1, warnings
+    assert len(subscribe) == 1, warnings
+    assert any("answering again" in r.getMessage() for r in caplog.records)
+
+
+async def test_an_unexpected_error_does_not_end_the_link_loops():
+    async with FakeTss() as fake:
+        source = TssSource()
+        client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
+        client.legacy.reopen_after_s = 0.1
+        client.subscription.reopen_after_s = 0.1
+
+        def fail_once(method):
+            calls = []
+
+            async def wrapper(*args, **kwargs):
+                calls.append(1)
+                if len(calls) == 1:
+                    raise RuntimeError("a bug")
+                return await method(*args, **kwargs)
+
+            return wrapper
+
+        client.legacy._request = fail_once(client.legacy._request)
+        client.subscription._serve = fail_once(client.subscription._serve)
+        client.start()
+        try:
+            await wait_until(lambda: source.snapshot().link == LinkStatus.OK, within=5)
+            assert all(not t.done() for t in client.tasks)
+        finally:
+            await client.stop()

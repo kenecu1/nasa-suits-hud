@@ -26,6 +26,7 @@ from suits.tss.transport import Tap, UdpEndpoint
 log = logging.getLogger(__name__)
 
 DEVICES = (codec.Device.DCU, codec.Device.UIA)
+SILENT_AFTER = 3  # unanswered Subscribes in a row before a warning
 
 
 class Subscription:
@@ -53,6 +54,7 @@ class Subscription:
         self._last_seen: dict[int, float] = {}  # device -> monotonic time of last telemetry
         self._last_ack: codec.AckResult | None = None
         self.subscribes_sent = 0
+        self._unanswered = 0  # Subscribes in a row with no Ack
 
     def _on_datagram(self, data: bytes) -> None:
         packet = self._source.feed(SUB_CHANNEL, data)
@@ -77,6 +79,8 @@ class Subscription:
                 continue
             try:
                 await self._serve(endpoint)
+            except Exception:  # never let one bug end the only subscription loop
+                log.exception("subscription loop failed; reopening")
             finally:
                 endpoint.close()
             await asyncio.sleep(self.reopen_after_s)  # the socket closed: pause, then reopen
@@ -110,7 +114,15 @@ class Subscription:
             try:
                 result = await asyncio.wait_for(self._ack.get(), self.retry_s)
             except TimeoutError:
+                self._unanswered += 1
+                if self._unanswered == SILENT_AFTER:
+                    log.warning("no answer to Subscribe from the TSS at %s:%d after %d tries "
+                                "(TSS down, or blocked by a firewall?)", *self._remote,
+                                SILENT_AFTER)
                 continue  # dropped Subscribe or Ack, or no TSS: send again
+            if self._unanswered >= SILENT_AFTER:
+                log.info("TSS at %s:%d is answering again", *self._remote)
+            self._unanswered = 0
             self._log_ack(result, device)
             if result == codec.AckResult.OK:
                 return True
