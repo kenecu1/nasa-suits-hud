@@ -78,4 +78,13 @@ describe("linkVm", () => {
   ])("shows mode %s in upper case", (mode, expected) => {
     expect(linkVm(makeState("ok", mode), "live").mode).toBe(expected);
   });
+
+  it.each(["rebooting", "toString", "constructor"])("shows a status it does not know (%s) as a warning", (tss) => {
+    const state = makeState();
+    const odd = { ...state, link: { ...state.link, tss } } as unknown as State;
+    const vm = linkVm(odd, "live");
+    expect(vm.text).toBe(`TSS ${tss.toUpperCase()}`);
+    expect(vm.level).toBe("warning");
+    expect(vm).toMatchObject(theme.level.warning);
+  });
 });

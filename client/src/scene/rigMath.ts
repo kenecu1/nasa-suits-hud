@@ -13,7 +13,9 @@ export function wrapAngle(angle: number): number {
  * (the last good value) is returned: the rig only turns, it never tilts or flips.
  */
 export function headYaw(dirX: number, dirZ: number, fallback: number): number {
-  if (Math.hypot(dirX, dirZ) < 0.001) return fallback;
+  const flat = Math.hypot(dirX, dirZ);
+  // Also when tracking hands back NaN: one bad frame must not make the rig vanish for good.
+  if (!Number.isFinite(flat) || flat < 0.001) return fallback;
   return Math.atan2(-dirX, -dirZ);
 }
 
@@ -22,7 +24,7 @@ export function headYaw(dirX: number, dirZ: number, fallback: number): number {
  * after that long about 63% of the gap is closed, whatever the frame rate.
  */
 export function followYaw(current: number, target: number, dtS: number, followS: number): number {
-  if (!(dtS > 0)) return wrapAngle(current);
+  if (!(dtS > 0) || !Number.isFinite(target)) return wrapAngle(current);
   const gap = wrapAngle(target - current);
   const fraction = followS > 0 ? 1 - Math.exp(-dtS / followS) : 1;
   return wrapAngle(current + gap * fraction);

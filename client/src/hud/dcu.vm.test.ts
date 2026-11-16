@@ -51,4 +51,13 @@ describe("dcuVm", () => {
     expect(vm.current).toBe(false);
     expect(vm.color).toBe(theme.level.stale.color);
   });
+
+  it.each(["BOGUS", "", 3, { a: 1 }])("shows -- for a position that is not PRI or SEC (%j)", (oxy) => {
+    const state = makeState();
+    const odd = { ...state, dcu: { ...state.dcu, oxy } } as unknown as State;
+    const vm = dcuVm(odd, "live");
+    expect(vm.text).toBe("--");
+    expect(vm.current).toBe(false);
+    expect(vm.color).toBe(theme.level.unknown.color);
+  });
 });

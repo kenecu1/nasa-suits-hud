@@ -1,7 +1,7 @@
 // Measures what was really drawn, once per frame, for window.__hud.view: is the panel inside
 // the view of each eye, where the head and the rig point, and how many draw calls a frame took.
 // It reads the renderer's own cameras, so in a WebXR session it sees what the headset sees.
-import { useFrame } from "@react-three/fiber";
+import { useFrame, type RootState } from "@react-three/fiber";
 import { useXR } from "@react-three/xr";
 import { useRef, type RefObject } from "react";
 import { Vector3, type Camera, type Group } from "three";
@@ -47,8 +47,21 @@ export function ViewProbe({ rigRef, panelRef }: {
     rigYawDeg: 0,
   });
 
+  const broken = useRef(false);
+
   // This runs before the frame is drawn, so the numbers describe the frame before it.
-  useFrame(({ gl, camera }) => {
+  useFrame((frame) => {
+    if (broken.current) return;
+    try {
+      measure(frame);
+    } catch (error) {
+      // Measuring is for tests. It must never stop the frame loop that draws the HUD.
+      broken.current = true;
+      console.error("The view probe stopped", error);
+    }
+  });
+
+  function measure({ gl, camera }: RootState): void {
     const rig = rigRef.current;
     const panel = panelRef.current;
     if (rig === null || panel === null || rig.userData[RIG_PLACED] !== true) return;
@@ -75,7 +88,7 @@ export function ViewProbe({ rigRef, panelRef }: {
     v.headYawDeg = headYaw(direction.x, direction.z, v.headYawDeg / RAD_TO_DEG) * RAD_TO_DEG;
     v.rigYawDeg = rig.rotation.y * RAD_TO_DEG;
     window.__hud.view = v;
-  });
+  }
 
   return null;
 }

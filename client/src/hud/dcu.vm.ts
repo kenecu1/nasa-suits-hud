@@ -3,8 +3,12 @@ import type { State } from "../contract.gen";
 import { theme } from "../theme";
 import type { Conn, DcuVm } from "./types";
 
+const POSITIONS: readonly string[] = ["PRI", "SEC"];
+
 export function dcuVm(state: State | null, conn: Conn): DcuVm {
-  const position = state?.dcu?.oxy ?? null;
+  const raw: unknown = state?.dcu?.oxy;
+  // Only the two positions the contract names. Anything else is shown as unknown, not passed on.
+  const position = typeof raw === "string" && POSITIONS.includes(raw) ? raw : null;
   const current = position !== null && conn === "live";
 
   let color: string = theme.color.text;

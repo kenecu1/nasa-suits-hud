@@ -91,11 +91,18 @@ export function startLink(options: LinkOptions): { stop(): void } {
         complain(result.error);
         return;
       }
+      // State first, then "live": the other order would show the old values as fresh for a moment.
+      try {
+        options.onState(result.state);
+      } catch (error) {
+        // A state the page cannot apply is as good as no state. It must not feed the watchdog,
+        // or the HUD would stay "live" on the last values it could show.
+        console.error("backend link: a state could not be applied", error);
+        return;
+      }
       attempt = 0;
       lastComplaint = "";
       armSilenceTimer();
-      // State first, then "live": the other order would show the old values as fresh for a moment.
-      options.onState(result.state);
       setConn("live");
     };
   }
@@ -105,6 +112,7 @@ export function startLink(options: LinkOptions): { stop(): void } {
     if (stopped) return;
     clearTimeout(silenceTimer);
     release();
+    lastComplaint = ""; // a new socket may complain afresh
     setConn("offline");
     if (retryTimer === undefined) {
       retryTimer = setTimeout(connect, backoffMs(attempt));

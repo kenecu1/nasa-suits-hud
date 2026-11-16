@@ -99,4 +99,20 @@ describe("o2Vm", () => {
     o2Vm(deepFreeze(state), "offline");
     expect(JSON.stringify(state)).toBe(copy);
   });
+
+  it("shows -- and unknown for a level word this client does not know, not a bare number", () => {
+    const odd = { value: 92, unit: "%", level: "critical" } as unknown as SuitValue;
+    const vm = o2Vm(makeState(odd), "live");
+    expect(vm.text).toBe("--");
+    expect(vm.level).toBe("unknown");
+    expect(vm).toMatchObject(theme.level.unknown);
+    // an inherited property name is not a level either
+    const inherited = { value: 92, unit: "%", level: "toString" } as unknown as SuitValue;
+    expect(o2Vm(makeState(inherited), "live")).toMatchObject({ text: "--", ...theme.level.unknown });
+  });
+
+  it("leaves out a unit that is not text", () => {
+    const odd = { value: 92, unit: { a: 1 }, level: "nominal" } as unknown as SuitValue;
+    expect(o2Vm(makeState(odd), "live").text).toBe("92");
+  });
 });

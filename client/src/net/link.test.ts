@@ -241,6 +241,35 @@ describe("startLink", () => {
     expect(sockets).toHaveLength(2);
   });
 
+  it("a state that cannot be applied does not count as heard: the link goes offline after the silence", () => {
+    const { sockets, sock, onState, onConn } = setup();
+    sock(0).message(msg(1));
+    expect(onConn).toHaveBeenLastCalledWith("live");
+    onState.mockImplementation(() => {
+      throw new Error("view model blew up");
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // The backend keeps sending every second, but nothing can be shown from it.
+    for (let second = 1; second <= 2; second++) {
+      vi.advanceTimersByTime(1000);
+      expect(() => sock(0).message(msg(1 + second))).not.toThrow();
+    }
+    expect(onConn).toHaveBeenLastCalledWith("live");
+    vi.advanceTimersByTime(1000);
+    expect(onConn).toHaveBeenLastCalledWith("offline");
+    expect(sock(0).closed).toBe(true);
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+
+    // It keeps trying, and recovers once states can be applied again.
+    onState.mockImplementation(() => {});
+    vi.advanceTimersByTime(500);
+    expect(sockets).toHaveLength(2);
+    sock(1).message(msg(9));
+    expect(onConn).toHaveBeenLastCalledWith("live");
+  });
+
   it("stop closes the socket, creates no more sockets and fires no callbacks", () => {
     const { sockets, sock, onState, onConn, link } = setup();
     sock(0).message(msg());

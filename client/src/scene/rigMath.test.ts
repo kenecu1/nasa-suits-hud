@@ -94,3 +94,15 @@ describe("followYaw", () => {
     expect(Math.abs(wrapAngle(target - yaw))).toBeLessThan(deg(1));
   });
 });
+
+describe("bad tracking data", () => {
+  it("headYaw returns the fallback for a direction with NaN in it", () => {
+    expect(headYaw(Number.NaN, -1, 0.7)).toBe(0.7);
+    expect(headYaw(0, Number.NaN, 0.7)).toBe(0.7);
+  });
+
+  it("followYaw stays where it is when the target is not a number", () => {
+    expect(followYaw(0.5, Number.NaN, 0.016, 0.35)).toBeCloseTo(0.5, 10);
+    expect(followYaw(0.5, Number.POSITIVE_INFINITY, 0.016, 0.35)).toBeCloseTo(0.5, 10);
+  });
+});

@@ -2,6 +2,7 @@
 // the Enter AR button. HTML is fine here; nothing inside the headset view is HTML.
 import { useState, type CSSProperties } from "react";
 import { useStore } from "zustand";
+import { SceneBoundary } from "./SceneBoundary";
 import { HudScene } from "./scene/HudScene";
 import { xrStore } from "./scene/xr";
 import { theme } from "./theme";
@@ -45,7 +46,9 @@ export function App() {
   return (
     <>
       <div style={stage}>
-        <HudScene />
+        <SceneBoundary>
+          <HudScene />
+        </SceneBoundary>
       </div>
       {!inSession && (
         <div style={bar}>

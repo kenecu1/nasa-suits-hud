@@ -12,7 +12,7 @@ const TSS: Record<LinkStatus, { text: string; level: Level }> = {
 };
 
 export function linkVm(state: State | null, conn: Conn): LinkVm {
-  const mode = state ? state.link.mode.toUpperCase() : null;
+  const mode = state ? String(state.link.mode).toUpperCase() : null;
 
   // The client's own connection comes first: what the backend last said about the TSS is
   // worth nothing once the backend itself is gone.
@@ -20,9 +20,9 @@ export function linkVm(state: State | null, conn: Conn): LinkVm {
   if (conn === "connecting" || state === null) return look("connecting", "CONNECTING", "unknown", mode);
 
   const status = state.link.tss;
-  const known = TSS[status] as { text: string; level: Level } | undefined;
   // A status this client does not know (a newer backend) is a warning, never shown as fine.
-  if (known === undefined) return look(status, `TSS ${String(status).toUpperCase()}`, "warning", mode);
+  if (!Object.hasOwn(TSS, status)) return look(status, `TSS ${String(status).toUpperCase()}`, "warning", mode);
+  const known = TSS[status];
   return look(status, known.text, known.level, mode);
 }
 
