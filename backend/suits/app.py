@@ -16,8 +16,19 @@ from suits.settings import Settings
 log = logging.getLogger(__name__)
 
 
+def _show_backend_logs() -> None:
+    """uvicorn configures only its own loggers; show ours (link events) on the console too."""
+    suits_log = logging.getLogger("suits")
+    if not suits_log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        suits_log.addHandler(handler)
+        suits_log.setLevel(logging.INFO)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    _show_backend_logs()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

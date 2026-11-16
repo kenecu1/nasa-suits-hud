@@ -14,7 +14,8 @@ function start(name, cmd, args) {
       : spawn(cmd, args, { cwd: ROOT, stdio: "inherit" });
   child.on("exit", (code) => {
     console.log(`${name} exited (${code})`);
-    stopAll();
+    // a clean client exit (e.g. no dev server yet) leaves the backend running
+    if (name === "backend" || code !== 0) stopAll();
   });
   children.push(child);
 }
