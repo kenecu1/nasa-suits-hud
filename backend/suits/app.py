@@ -5,10 +5,10 @@ Run: uvicorn --factory suits.app:create_app  (npm run dev does this)
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+import anyio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from suits.runtime import Runtime, start_runtime
@@ -68,33 +68,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         publisher = runtime_of(app).publisher
         queue = publisher.subscribe()
 
-        async def send_states() -> None:
-            while True:
-                state = await queue.get()
-                await websocket.send_text(state.model_dump_json())
-
-        async def until_closed() -> None:
-            # Reading notices a closed socket at once, not at the next send.
-            # M1 clients send nothing; command messages arrive here from M2 on.
-            while (await websocket.receive())["type"] != "websocket.disconnect":
-                pass
-
-        sender = asyncio.create_task(send_states())
-        receiver = asyncio.create_task(until_closed())
+        # An anyio task group, not raw asyncio tasks: Starlette runs the socket inside anyio
+        # cancel scopes, and cancelling hand-made tasks inside them let a CancelledError escape
+        # now and then when the client closed (a flaky test showed it).
         try:
-            await asyncio.wait({sender, receiver}, return_when=asyncio.FIRST_COMPLETED)
+            async with anyio.create_task_group() as group:
+
+                async def send_states() -> None:
+                    while True:
+                        state = await queue.get()
+                        try:
+                            await websocket.send_text(state.model_dump_json())
+                        except WebSocketDisconnect:
+                            group.cancel_scope.cancel()
+                            return
+
+                async def until_closed() -> None:
+                    # Reading notices a closed socket at once, not at the next send.
+                    # M1 clients send nothing; command messages arrive here from M2 on.
+                    while (await websocket.receive())["type"] != "websocket.disconnect":
+                        pass
+                    group.cancel_scope.cancel()
+
+                group.start_soon(send_states)
+                group.start_soon(until_closed)
         finally:
             publisher.unsubscribe(queue)
-            for task in (sender, receiver):
-                task.cancel()
-            results = await asyncio.gather(sender, receiver, return_exceptions=True)
-        for result in results:
-            if isinstance(result, (asyncio.CancelledError, WebSocketDisconnect)):
-                continue
-            if isinstance(result, RuntimeError) and receiver.done():
-                continue  # a send raced with the client closing
-            if isinstance(result, BaseException):
-                log.error("websocket ended with an error", exc_info=result)
 
     return app
 
