@@ -169,6 +169,7 @@ class FakeTss:
         self.drop_subscribes = 0  # drop this many Subscribe packets before answering
         self.silent = False  # answer nothing and push nothing
         self.bad_json = False  # legacy GET replies are not JSON
+        self.ack_delay_s = 0.0  # answer Subscribe this late (the real TSS: up to ~1 s)
         # observations
         self.subscribers: dict[int, tuple[str, int]] = {}
         self.subscribes_received = 0
@@ -270,7 +271,11 @@ class FakeTss:
                 return
             if self.ack_result == codec.AckResult.OK:
                 self.subscribers[device] = addr
-            self._reply(codec.build_ack(now, self.ack_result), addr)
+            ack = codec.build_ack(now, self.ack_result)
+            if self.ack_delay_s > 0:
+                asyncio.get_running_loop().call_later(self.ack_delay_s, self._reply, ack, addr)
+            else:
+                self._reply(ack, addr)
         elif packet.code == codec.Code.UNSUBSCRIBE:
             for device in (codec.Device.SPM, codec.Device.SSU, codec.Device.CTS, codec.Device.XRF):
                 self.subscribers.pop(device, None)

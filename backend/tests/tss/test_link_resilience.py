@@ -102,3 +102,21 @@ async def test_one_device_going_quiet_is_resubscribed_on_its_own():
             await wait_until(lambda: 2 in fake.subscribers, timeout=4)
         finally:
             await client.stop()
+
+
+async def test_late_acks_are_not_thrown_away():
+    # Live, the TSS answered Subscribe after ~1 s while we resent every 0.5 s and discarded
+    # Acks before each resend, so subscribing took several rounds. This checks the intended
+    # behaviour with late Acks; the original race depends on exact timing.
+    async with FakeTss() as fake:
+        fake.ack_delay_s = 0.7
+        source = TssSource()
+        client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
+        client.subscription.retry_s = 0.5
+        client.start()
+        try:
+            await wait_until(lambda: len(fake.subscribers) == 2, timeout=4)
+        finally:
+            await client.stop()
+
+    assert fake.subscribes_received <= 4  # at most one resend per device

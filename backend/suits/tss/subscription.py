@@ -35,7 +35,7 @@ class Subscription:
         host: str,
         port: int = 14141,
         tap: Tap | None = None,
-        retry_s: float = 0.5,
+        retry_s: float = 1.0,  # the real TSS takes up to about 1 s to answer
         unassigned_retry_s: float = 1.0,
         resubscribe_after_s: float = 3.0,
         reopen_after_s: float = 1.0,
@@ -97,9 +97,14 @@ class Subscription:
             await _wait_or_closed(endpoint, 0.5)
 
     async def _subscribe(self, endpoint: UdpEndpoint, device: codec.Device) -> bool:
-        """Send Subscribe until Ack 0. False if the socket closed first."""
+        """Send Subscribe until Ack 0. False if the socket closed first.
+
+        Acks carry no device id. Old Acks are cleared once, before the first send for this
+        device, never before a resend: the real TSS can take a second to answer, and a late Ack
+        for an earlier send of the same Subscribe is a valid answer.
+        """
+        self._drain_acks()
         while not endpoint.closed.is_set():
-            self._drain_acks()
             if endpoint.send(codec.build_subscribe(int(self._timestamp()), device)):
                 self.subscribes_sent += 1
             try:
