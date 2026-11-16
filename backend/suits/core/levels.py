@@ -19,7 +19,7 @@ class RangesError(ValueError):
 
 class _Entry(BaseModel):
     # strict: "20" is not a number; forbid: a typo'd key is an error, not ignored
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class RangedValue(_Entry):
@@ -46,6 +46,25 @@ class RangesFile(_Entry):
     ranges: dict[str, RangedValue] = Field(min_length=1)
     unranged: dict[str, UnrangedValue] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def _names_are_unique_and_named(self) -> RangesFile:
+        if "" in self.ranges or "" in self.unranged:
+            raise ValueError("a value has an empty name")
+        both = sorted(set(self.ranges) & set(self.unranged))
+        if both:
+            # store.py would let the unranged entry win and the alarm would never fire
+            raise ValueError(f"{', '.join(both)} is in both ranges and unranged")
+        return self
+
+
+def _no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict:
+    seen: dict = {}
+    for key, value in pairs:
+        if key in seen:
+            raise RangesError(f"duplicate key {key!r}")
+        seen[key] = value
+    return seen
+
 
 def load_ranges(path: Path | None = None) -> dict:
     """Read and check data/ranges.json. Raises RangesError naming the file and the key.
@@ -56,7 +75,9 @@ def load_ranges(path: Path | None = None) -> dict:
     path = path or RANGES_FILE
     try:
         with open(path, encoding="utf-8") as f:
-            data = json.load(f)
+            data = json.load(f, object_pairs_hook=_no_duplicate_keys)
+    except RangesError as exc:
+        raise RangesError(f"{path}: {exc}") from exc
     except OSError as exc:
         raise RangesError(f"{path}: cannot read: {exc}") from exc
     except json.JSONDecodeError as exc:
