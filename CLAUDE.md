@@ -49,7 +49,7 @@ M1 creates these unless a milestone is named. Whoever adds or changes a command 
 | `npm run eval:voice` | (M6) Voice evaluation against the real API; needs `ANTHROPIC_API_KEY` |
 | `npm run demo` | (M8) Sim mode plus the full mission scenario |
 
-Backend modes, set with `SUITS_MODE`: `sim` (default, built-in fake TSS), `replay` (`SUITS_RECORDING=<file>`), `live` (`TSS_HOST`, `TSS_TEAM`).
+Backend modes, set with `SUITS_MODE`: `sim` (default, built-in fake TSS), `replay` (`SUITS_RECORDING=<file>`, optional `SUITS_REPLAY_SPEED`), `live` (`TSS_HOST`, `TSS_TEAM`). `SUITS_RECORD=1` saves raw TSS datagrams to `data/recordings/` in sim and live mode. The backend listens on port 8000 (`SUITS_PORT`); `/health` says `degraded` if a background task died or no state was sent for 3 s.
 
 ## Testing
 
