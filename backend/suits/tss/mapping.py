@@ -71,6 +71,8 @@ def telemetry_values(section: dict[str, Any]) -> dict[str, float | None]:
     values: dict[str, float | None] = {}
     for name, raw in section.items():
         values[name] = _finite(raw)
+    if all(v is None for v in values.values()):
+        raise BadField("telemetry has no value that is a finite number")
     return values
 
 

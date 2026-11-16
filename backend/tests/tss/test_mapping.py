@@ -69,3 +69,28 @@ def test_the_snapshot_carries_elapsed_seconds_from_telemetry():
     source.feed("legacy/1", b'{"oxy_pri_storage": 92.0, "eva_elapsed_time": 600}')
 
     assert source.snapshot().elapsed_s == 600.0
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [b'{"oxy_pri_storage": "92", "heart_rate": null}', b'{"oxy_pri_storage": true}'],
+    ids=["strings-and-null", "bool"],
+)
+def test_telemetry_with_no_usable_number_is_bad_data_not_fresh(reply):
+    source = TssSource()
+
+    source.feed("legacy/1", reply)
+
+    snap = source.snapshot()
+    assert source.decode_errors == 1
+    assert snap.link == "bad_data"
+    assert "telemetry" not in snap.ages  # not counted as fresh telemetry
+    assert snap.telemetry == {}
+
+
+def test_telemetry_with_some_numbers_is_kept():
+    source = TssSource()
+
+    source.feed("legacy/1", b'{"oxy_pri_storage": 92.0, "heart_rate": null}')
+
+    assert source.snapshot().telemetry == {"oxy_pri_storage": 92.0, "heart_rate": None}
