@@ -30,6 +30,18 @@ describe("buildHud", () => {
     });
   });
 
+  it("puts each view model under its own key, with the words the wearer reads", () => {
+    const live = buildHud(makeState(), "live");
+    expect(live.o2).toMatchObject({ label: "O2 PRI", text: "92%", word: "NOMINAL", shape: "circle" });
+    expect(live.dcu).toMatchObject({ label: "O2 SWITCH", text: "PRI", current: true });
+    expect(live.link).toMatchObject({ label: "LINK", text: "TSS OK", mode: "SIM", status: "ok" });
+
+    const offline = buildHud(makeState(), "offline");
+    expect(offline.o2).toMatchObject({ text: "92%", word: "STALE", shape: "square" });
+    expect(offline.dcu).toMatchObject({ text: "PRI", current: false });
+    expect(offline.link).toMatchObject({ text: "OFFLINE", word: "WARNING", shape: "triangle" });
+  });
+
   it("returns the three panels without a state", () => {
     expect(buildHud(null, "connecting")).toEqual({
       o2: o2Vm(null, "connecting"),
@@ -42,8 +54,8 @@ describe("buildHud", () => {
 describe("theme.level", () => {
   const styles = LEVELS.map((level) => theme.level[level]);
 
-  it("covers five levels", () => {
-    expect(styles).toHaveLength(5);
+  it("has a style for exactly the five levels of the contract", () => {
+    expect(Object.keys(theme.level).sort()).toEqual(["caution", "nominal", "stale", "unknown", "warning"]);
   });
 
   it("gives every level its own shape", () => {

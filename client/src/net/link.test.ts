@@ -270,6 +270,56 @@ describe("startLink", () => {
     expect(onConn).toHaveBeenLastCalledWith("live");
   });
 
+  it("keeps trying when a socket cannot even be created", () => {
+    const sockets: FakeSocket[] = [];
+    const onConn = vi.fn<(conn: Conn) => void>();
+    const onState = vi.fn<(state: State) => void>();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    let refuse = 2;
+    const link = startLink({
+      url: WS_URL,
+      onState,
+      onConn,
+      makeSocket: (url) => {
+        if (refuse-- > 0) throw new Error("refused");
+        const socket = new FakeSocket(url);
+        sockets.push(socket);
+        return socket;
+      },
+    });
+
+    expect(onConn).toHaveBeenLastCalledWith("offline");
+    vi.advanceTimersByTime(500); // second try, refused again
+    expect(sockets).toHaveLength(0);
+    vi.advanceTimersByTime(999);
+    expect(sockets).toHaveLength(0);
+    vi.advanceTimersByTime(1); // third try, 1000 ms later: backoff applies here too
+    expect(sockets).toHaveLength(1);
+    sockets[0]?.message(msg());
+    expect(onConn).toHaveBeenLastCalledWith("live");
+    expect(onState).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledTimes(2);
+    logged.mockRestore();
+    link.stop();
+  });
+
+  it("a status change that cannot be applied does not count as heard either", () => {
+    const { sock, onConn } = setup();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    onConn.mockImplementation((conn) => {
+      if (conn === "live") throw new Error("could not build the panels");
+    });
+
+    for (let second = 0; second < 3; second++) {
+      expect(() => sock(0).message(msg(second))).not.toThrow();
+      vi.advanceTimersByTime(1000);
+    }
+    // Messages kept coming, but none could be shown: the watchdog still fires at 3 s.
+    expect(sock(0).closed).toBe(true);
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it("stop closes the socket, creates no more sockets and fires no callbacks", () => {
     const { sockets, sock, onState, onConn, link } = setup();
     sock(0).message(msg());

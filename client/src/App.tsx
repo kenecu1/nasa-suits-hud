@@ -1,6 +1,6 @@
 // The page: the HUD scene, and on top of it (outside the headset view only) a start bar with
 // the Enter AR button. HTML is fine here; nothing inside the headset view is HTML.
-import { useState, type CSSProperties } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
 import { useStore } from "zustand";
 import { SceneBoundary } from "./SceneBoundary";
 import { HudScene } from "./scene/HudScene";
@@ -28,10 +28,26 @@ const button: CSSProperties = {
   color: theme.color.text,
   cursor: "pointer",
 };
+const notice: CSSProperties = {
+  position: "fixed",
+  left: 16,
+  bottom: 16,
+  font: "16px system-ui, sans-serif",
+  color: theme.color.warning,
+};
+
+/** The whole canvas is being rebuilt, and a headset session cannot move to a new renderer. */
+function endSessionOnCanvasCrash(problem: string | null): void {
+  if (problem === null) return;
+  const session = xrStore.getState().session;
+  session?.end().catch((error: unknown) => console.error("Ending the AR session failed", error));
+}
 
 export function App() {
   const inSession = useStore(xrStore, (s) => s.session != null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [hudProblem, setHudProblem] = useState<string | null>(null);
+  const onHudProblem = useCallback((reason: string | null) => setHudProblem(reason), []);
 
   // Entering AR must start from a click (a browser rule), so this stays a plain button.
   const enterAr = () => {
@@ -43,13 +59,20 @@ export function App() {
     });
   };
 
+  const stopped = (reason: string) => (
+    <div role="alert" style={notice}>
+      The HUD stopped ({reason}). Restarting it.
+    </div>
+  );
+
   return (
     <>
       <div style={stage}>
-        <SceneBoundary>
-          <HudScene />
+        <SceneBoundary fallback={stopped} onProblem={endSessionOnCanvasCrash}>
+          <HudScene onHudProblem={onHudProblem} />
         </SceneBoundary>
       </div>
+      {hudProblem !== null && stopped(hudProblem)}
       {!inSession && (
         <div style={bar}>
           <strong style={{ color: theme.color.text }}>SUITS HUD</strong>

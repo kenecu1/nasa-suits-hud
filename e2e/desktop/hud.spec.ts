@@ -1,4 +1,5 @@
 // The laptop page against the real backend in sim mode (acceptance 13 and 15).
+import { REAL_RECORDING } from "../support/backend";
 import { expect, hud, hudIsLive, PAGE, sceneIsSteady, screenshot, test, view } from "../support/fixtures";
 
 test("the panel shows the backend's oxygen value, switch position and link", async ({ page, backend }, testInfo) => {
@@ -58,6 +59,32 @@ test("a stopped backend shows offline within 4 s, and the page recovers without 
     await page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument),
     "the page must not have reloaded",
   ).toBe(true);
+});
+
+test("a value that is not the sim's reaches the page: replay of the real TSS recording", async ({ page, backend }) => {
+  // The sim always says 92%. The recording of the real TSS drains from about 90%, so this
+  // proves the page shows what the backend sends and not a number that happens to match.
+  await backend.start({ mode: "replay", recording: REAL_RECORDING });
+  await page.goto(PAGE);
+  await expect.poll(async () => (await hud(page)).panels.link.mode, { timeout: 15_000 }).toBe("REPLAY");
+
+  // The value moves, so read the backend and the page at the same moment and try again if a
+  // new state landed in between.
+  let shown = "";
+  await expect
+    .poll(
+      async () => {
+        const [state, onPage] = await Promise.all([backend.state(), hud(page)]);
+        const value = state.suit.values.oxy_pri_storage?.value;
+        shown = onPage.panels.o2.text;
+        return typeof value === "number" && shown === `${Math.floor(value)}%`;
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  expect(shown).toMatch(/^\d+%$/);
+  expect(shown).not.toBe("92%");
+  expect((await hud(page)).panels.dcu.text).toMatch(/^(PRI|SEC)$/);
 });
 
 test("the scene uses at most 50 draw calls", async ({ page, backend: _backend }) => {

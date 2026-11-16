@@ -3,7 +3,8 @@
 // treat any missing value inside it as unknown.
 import type { State } from "../contract.gen";
 
-export const CONTRACT_VERSION = 2;
+// Typed from the generated contract: when the contract's version changes, this stops compiling.
+export const CONTRACT_VERSION: State["v"] = 2;
 
 export type ParseResult = { state: State } | { error: string };
 

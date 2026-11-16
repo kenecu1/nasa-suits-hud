@@ -15,6 +15,9 @@ type EmulatorWindow = Window & {
     metaQuest3: unknown;
   };
   __headset: EmulatedHeadset;
+  /** What the page asked the emulated device for, and the session it was given. */
+  __requestedMode?: string;
+  __session?: { environmentBlendMode?: string };
 };
 
 /** Turn the emulated head about the up axis. Positive is to the wearer's left. */
@@ -34,6 +37,18 @@ test.beforeEach(async ({ page }) => {
     // native one alone unless forced (docs/notes/xr-emulation-headless-works.md).
     headset.installRuntime({ forceInstall: true });
     w.__headset = headset;
+    // Record the request the device itself receives, not what the page says it asked for.
+    const { xr } = navigator as unknown as {
+      xr: { requestSession(mode: string, init?: unknown): Promise<{ environmentBlendMode?: string }> };
+    };
+    const request = xr.requestSession.bind(xr);
+    xr.requestSession = (mode, init) => {
+      w.__requestedMode = mode;
+      return request(mode, init).then((session) => {
+        w.__session = session;
+        return session;
+      });
+    };
   });
 });
 
@@ -48,6 +63,12 @@ test("Enter AR starts an immersive-ar session with the panel in view, and the pa
   await page.getByRole("button", { name: "Enter AR" }).click();
   await expect.poll(async () => (await view(page)).presenting, { timeout: 15_000 }).toBe(true);
   expect((await view(page)).xrMode).toBe("immersive-ar");
+  // The emulated device was asked for AR and gave a see-through session.
+  const granted = await page.evaluate(() => {
+    const w = window as unknown as EmulatorWindow;
+    return { mode: w.__requestedMode, blend: w.__session?.environmentBlendMode };
+  });
+  expect(granted).toEqual({ mode: "immersive-ar", blend: "alpha-blend" });
   // The start bar is HTML and must be gone: nothing in the headset view is HTML.
   await expect(page.getByRole("button", { name: "Enter AR" })).toHaveCount(0);
 

@@ -40,7 +40,7 @@ declare global {
 export function installTestHook(): () => void {
   const read = (): Omit<HudHook, "view"> => {
     const { panels, conn, state } = useHud.getState();
-    return { panels, conn, seq: state?.seq ?? null };
+    return { panels, conn, seq: typeof state?.seq === "number" ? state.seq : null };
   };
   window.__hud = { ...read(), view: null };
   return useHud.subscribe(() => Object.assign(window.__hud, read()));

@@ -4,8 +4,10 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-const backendPort = process.env.SUITS_PORT ?? "8000";
-const clientPort = Number(process.env.SUITS_CLIENT_PORT ?? "5173");
+// `||`, not `??`: an empty variable means "not set", and Number("") would be port 0.
+const backendPort = process.env.SUITS_PORT || "8000";
+const clientPort = Number(process.env.SUITS_CLIENT_PORT || "5173");
+if (!Number.isInteger(clientPort)) throw new Error(`SUITS_CLIENT_PORT must be a port number, got "${process.env.SUITS_CLIENT_PORT}"`);
 
 export default defineConfig({
   plugins: [react()],

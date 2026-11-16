@@ -136,3 +136,14 @@ def test_main_needs_a_host(monkeypatch, capsys):
         tss_smoke.main([])
     assert stopped.value.code == 2
     assert "TSS_HOST" in capsys.readouterr().err
+
+
+def test_main_refuses_a_run_of_no_length(capsys):
+    with pytest.raises(SystemExit) as stopped:
+        tss_smoke.main(["--host", "127.0.0.1", "--seconds", "0"])
+    assert stopped.value.code == 2
+    assert "--seconds" in capsys.readouterr().err
+
+
+def test_every_link_status_except_ok_has_a_hint():
+    assert set(tss_smoke.HINTS) == set(LinkStatus) - {LinkStatus.OK}

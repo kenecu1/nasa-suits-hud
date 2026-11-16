@@ -54,8 +54,9 @@ export function startLink(options: LinkOptions): { stop(): void } {
 
   function setConn(next: Conn): void {
     if (next === conn) return;
-    conn = next;
+    // Tell the page first: if that throws, the status is not recorded and is tried again.
     options.onConn(next);
+    conn = next;
   }
 
   function armSilenceTimer(): void {
@@ -94,6 +95,7 @@ export function startLink(options: LinkOptions): { stop(): void } {
       // State first, then "live": the other order would show the old values as fresh for a moment.
       try {
         options.onState(result.state);
+        setConn("live");
       } catch (error) {
         // A state the page cannot apply is as good as no state. It must not feed the watchdog,
         // or the HUD would stay "live" on the last values it could show.
@@ -103,7 +105,6 @@ export function startLink(options: LinkOptions): { stop(): void } {
       attempt = 0;
       lastComplaint = "";
       armSilenceTimer();
-      setConn("live");
     };
   }
 
@@ -113,10 +114,15 @@ export function startLink(options: LinkOptions): { stop(): void } {
     clearTimeout(silenceTimer);
     release();
     lastComplaint = ""; // a new socket may complain afresh
-    setConn("offline");
+    // Schedule the retry before telling the page, so nothing the page does can stop it.
     if (retryTimer === undefined) {
       retryTimer = setTimeout(connect, backoffMs(attempt));
       attempt += 1;
+    }
+    try {
+      setConn("offline");
+    } catch (error) {
+      console.error("backend link: the page could not be told the link is offline", error);
     }
   }
 

@@ -4,6 +4,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useXR, XR } from "@react-three/xr";
 import { useEffect, useRef } from "react";
 import type { Group } from "three";
+import { SceneBoundary } from "../SceneBoundary";
 import { theme } from "../theme";
 import { HudRig } from "./HudRig";
 import { StatusPanel } from "./StatusPanel";
@@ -19,7 +20,7 @@ function LaptopView() {
 
   useEffect(() => {
     if (inSession) return;
-    // A session leaves the camera wherever the head was.
+    // Whatever a session did to the camera, the laptop view is always from the same fixed place.
     camera.position.set(0, cam.eyeHeightM, 0);
     camera.rotation.set(0, 0, 0);
     camera.updateMatrixWorld();
@@ -41,7 +42,7 @@ function Hud() {
   );
 }
 
-export function HudScene() {
+export function HudScene({ onHudProblem }: { onHudProblem: (problem: string | null) => void }) {
   return (
     <Canvas
       camera={{ fov: cam.fovDeg, near: cam.near, far: cam.far, position: [0, cam.eyeHeightM, 0] }}
@@ -49,7 +50,10 @@ export function HudScene() {
     >
       <XR store={xrStore}>
         <LaptopView />
-        <Hud />
+        {/* Inside the canvas: if the HUD crashes, the renderer and a headset session live on. */}
+        <SceneBoundary onProblem={onHudProblem}>
+          <Hud />
+        </SceneBoundary>
       </XR>
     </Canvas>
   );

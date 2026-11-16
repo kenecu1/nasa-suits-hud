@@ -22,6 +22,7 @@ const CORNERS = [
 
 const point = new Vector3();
 const direction = new Vector3();
+const laptopEye: Camera[] = [];
 
 /** True when a world point lies inside what this camera draws. */
 function sees(eye: Camera, world: Vector3): boolean {
@@ -68,13 +69,16 @@ export function ViewProbe({ rigRef, panelRef }: {
 
     const v = view.current;
     const presenting = gl.xr.isPresenting;
-    const eyes: readonly Camera[] = presenting ? gl.xr.getCamera().cameras : [camera];
+    laptopEye[0] = camera;
+    const eyes: readonly Camera[] = presenting ? gl.xr.getCamera().cameras : laptopEye;
 
     panel.updateWorldMatrix(true, false);
     let inView = eyes.length > 0;
-    for (const [x, y] of CORNERS) {
+    // Plain index loops: this runs every frame and should not allocate.
+    for (let c = 0; c < CORNERS.length; c++) {
+      const [x, y] = CORNERS[c] as (typeof CORNERS)[number];
       corner.current.set(x, y, 0).applyMatrix4(panel.matrixWorld);
-      for (const eye of eyes) inView &&= sees(eye, corner.current);
+      for (let e = 0; e < eyes.length; e++) inView &&= sees(eyes[e] as Camera, corner.current);
     }
 
     camera.getWorldDirection(direction);
@@ -87,7 +91,7 @@ export function ViewProbe({ rigRef, panelRef }: {
     if (!inView) v.framesOutOfView += 1;
     v.headYawDeg = headYaw(direction.x, direction.z, v.headYawDeg / RAD_TO_DEG) * RAD_TO_DEG;
     v.rigYawDeg = rig.rotation.y * RAD_TO_DEG;
-    window.__hud.view = v;
+    if (window.__hud) window.__hud.view = v;
   }
 
   return null;
