@@ -7,7 +7,11 @@ const isWindows = process.platform === "win32";
 const children = [];
 
 function start(name, cmd, args) {
-  const child = spawn(cmd, args, { cwd: ROOT, stdio: "inherit", shell: isWindows && cmd === "npm" });
+  // npm is a .cmd file on Windows and needs a shell: pass one command line, not an args array
+  const child =
+    isWindows && cmd === "npm"
+      ? spawn([cmd, ...args].join(" "), { cwd: ROOT, stdio: "inherit", shell: true })
+      : spawn(cmd, args, { cwd: ROOT, stdio: "inherit" });
   child.on("exit", (code) => {
     console.log(`${name} exited (${code})`);
     stopAll();

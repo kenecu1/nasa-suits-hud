@@ -8,9 +8,17 @@ import { ROOT, venvPython } from "./py.mjs";
 
 const isWindows = process.platform === "win32";
 
+const quote = (arg) => (/[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg);
+
+// On Windows, npm and npx are .cmd files and need a shell; pass one quoted command line.
+function spawnArgs(cmd, args) {
+  return isWindows ? [[cmd, ...args].map(quote).join(" "), [], { shell: true }] : [cmd, args, {}];
+}
+
 function run(cmd, args, options = {}) {
   console.log(`> ${cmd} ${args.join(" ")}`);
-  const result = spawnSync(cmd, args, { cwd: ROOT, stdio: "inherit", shell: isWindows, ...options });
+  const [file, fileArgs, shell] = spawnArgs(cmd, args);
+  const result = spawnSync(file, fileArgs, { cwd: ROOT, stdio: "inherit", ...shell, ...options });
   if (result.status !== 0) {
     console.error(`Failed: ${cmd} ${args.join(" ")}`);
     process.exit(result.status ?? 1);
@@ -20,10 +28,10 @@ function run(cmd, args, options = {}) {
 function findBasePython() {
   const candidates = isWindows ? [["py", ["-3.12"]], ["py", ["-3"]], ["python", []]] : [["python3", []], ["python", []]];
   for (const [cmd, pre] of candidates) {
-    const probe = spawnSync(cmd, [...pre, "-c", "import sys; print(sys.version_info >= (3, 11))"], {
-      encoding: "utf8",
-      shell: isWindows,
-    });
+    const [file, fileArgs, shell] = spawnArgs(cmd, [
+      ...pre, "-c", "import sys; print(sys.version_info >= (3, 11))",
+    ]);
+    const probe = spawnSync(file, fileArgs, { encoding: "utf8", ...shell });
     if (probe.status === 0 && probe.stdout.trim() === "True") return [cmd, pre];
   }
   console.error("Python 3.11 or newer is needed.");
