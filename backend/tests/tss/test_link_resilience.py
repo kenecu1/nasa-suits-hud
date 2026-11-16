@@ -5,8 +5,10 @@ import socket
 
 from suits.contract import STALE_AFTER_S, LinkStatus
 from suits.sim.fake_tss import FakeTss
+from suits.tss import codec
 from suits.tss.client import TssAddress, TssClient
 from suits.tss.source import TssSource
+from suits.tss.subscription import Subscription
 from tests.helpers import wait_until
 
 
@@ -103,19 +105,50 @@ async def test_one_device_going_quiet_is_resubscribed_on_its_own():
             await client.stop()
 
 
-async def test_late_acks_are_not_thrown_away():
-    # Live, the TSS answered Subscribe after ~1 s while we resent every 0.5 s and discarded
-    # Acks before each resend, so subscribing took several rounds. This checks the intended
-    # behaviour with late Acks; the original race depends on exact timing.
-    async with FakeTss() as fake:
-        fake.ack_delay_s = 0.7
-        source = TssSource()
-        client = TssClient(source, TssAddress("127.0.0.1", fake.sub_port, fake.legacy_port))
-        client.subscription.retry_s = 0.5
-        client.start()
-        try:
-            await wait_until(lambda: len(fake.subscribers) == 2, within=4)
-        finally:
-            await client.stop()
+class _AckLandsWithTheTimeout(asyncio.Queue):
+    """The first wait for an Ack times out, and the Ack for that send lands in the same
+    event-loop turn, before the subscriber resumes. Seen live: real-tss-6293795.jsonl at 1.57 s
+    has two Acks recorded just before a third Subscribe. Real timers cannot place it there
+    reliably on every OS, so this queue does it on purpose."""
 
-    assert fake.subscribes_received <= 4  # at most one resend per device
+    def __init__(self) -> None:
+        super().__init__()
+        self.first = True
+
+    async def get(self):
+        if not self.first:
+            return await super().get()
+        self.first = False
+        try:
+            return await super().get()
+        except asyncio.CancelledError:  # wait_for's timeout cancels us...
+            self.put_nowait(codec.AckResult.OK)  # ...and the late Ack is already here
+            raise
+
+
+class _SilentEndpoint:
+    """Counts Subscribes; the TSS behind it never answers again."""
+
+    def __init__(self) -> None:
+        self.closed = asyncio.Event()
+        self.sent = 0
+
+    def send(self, data: bytes) -> bool:
+        self.sent += 1
+        return True
+
+
+async def test_a_late_ack_is_not_thrown_away():
+    subscription = Subscription(TssSource(), "127.0.0.1", 9, retry_s=0.05)
+    subscription._ack = _AckLandsWithTheTimeout()
+    endpoint = _SilentEndpoint()
+
+    subscribed = await asyncio.wait_for(subscription._subscribe(endpoint, codec.Device.DCU), 2)
+
+    assert subscribed is True
+    assert endpoint.sent == 2  # the first send timed out, the resend found the late Ack
+
+
+def test_subscribe_retries_after_one_second_by_default():
+    # the real TSS takes up to about a second to answer (tss-legacy-port-is-slow)
+    assert Subscription(TssSource(), "127.0.0.1").retry_s == 1.0
