@@ -150,3 +150,42 @@ def test_a_failed_start_leaves_nothing_open(monkeypatch):
 def test_bad_settings_are_refused(env):
     with pytest.raises(SettingsError):
         Settings.from_env(env)
+
+
+def test_health_is_degraded_and_names_a_task_that_died(client):
+    from suits.tasks import spawn
+
+    runtime = client.app.state.runtime
+
+    async def boom():
+        raise RuntimeError("boom")
+
+    def start_boom():
+        runtime.tasks.append(spawn(boom(), "boom"))
+
+    client.portal.call(start_boom)
+    deadline = time.monotonic() + 2
+    while not runtime.tasks[-1].done() and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+    body = client.get("/health").json()
+
+    assert body["status"] == "degraded"
+    assert body["dead_tasks"] == ["boom"]
+
+
+def test_health_is_degraded_when_no_state_was_sent_for_too_long(client):
+    from suits.app import HEARTBEAT_LATE_S
+
+    runtime = client.app.state.runtime
+    publisher_task = next(t for t in runtime.tasks if t.get_name() == "publisher")
+    client.portal.call(publisher_task.cancel)  # cancelled: stuck, but not "dead"
+    deadline = time.monotonic() + 2
+    while not publisher_task.done() and time.monotonic() < deadline:
+        time.sleep(0.02)
+    runtime.publisher._latest_at -= HEARTBEAT_LATE_S + 1  # as if the last send was long ago
+
+    body = client.get("/health").json()
+
+    assert body["status"] == "degraded"
+    assert body["dead_tasks"] == []
