@@ -175,7 +175,7 @@ class UiaFlags:
     depress: int
 
 
-UIA_SIZE = 6  # the TSS sends 12 bytes; bytes 6-11 are uninitialised memory
+UIA_SIZE = 6  # older TSS builds (6293795) sent 12 bytes; bytes 6-11 were uninitialised memory
 
 
 @dataclass(frozen=True)
@@ -197,7 +197,7 @@ class SsuData:
     bb: SsuDrill
 
 
-SSU_SIZE = 33
+SSU_SIZE = 33  # 7dfc42b sends 34: byte 33 is keepout, not decoded yet
 _SSU_DRILL = struct.Struct(">BBBfff")  # 15 bytes
 
 
@@ -215,8 +215,8 @@ def decode_uia(payload: bytes) -> UiaFlags:
     return UiaFlags(*payload[:UIA_SIZE])
 
 
-def encode_uia(flags: UiaFlags, pad_to: int = 12) -> bytes:
-    """As the TSS sends it: 6 flag bytes, padded with zeros to 12."""
+def encode_uia(flags: UiaFlags, pad_to: int = UIA_SIZE) -> bytes:
+    """As the TSS sends it: 6 flag bytes. ``pad_to=12`` mimics older TSS builds."""
     raw = bytes(
         [
             flags.eva_power,

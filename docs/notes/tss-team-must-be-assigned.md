@@ -1,6 +1,6 @@
 The TSS answers Subscribe with Ack 1 and sends no data until our IP address is assigned to a group and that group to a team in the TSS web UI.
 
-Verified live at commit 6293795.
+Verified live at commit 6293795; still true at 7dfc42b (2026-11-19).
 
 - The TSS identifies a client by source IP. Assignment is done in the web UI at `http://<tss-ip>:14141` (it sends `POST /groups`).
 - From a script (verified 2026-11-16): our IP appears in `GET /data/groups.json` under `devices` after our first Subscribe. Then `POST /groups` with form body `device=<index>&group=<g>` puts it in a group, and `group=<g>&team=<t>` assigns the group to a team (both return 201). With the TSS in WSL, the laptop's address as the TSS sees it is the WSL host adapter (for example `172.22.240.1`), not the Wi-Fi address.

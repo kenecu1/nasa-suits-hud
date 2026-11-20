@@ -11,9 +11,9 @@ File name: `<area>-<short-lesson>.md`. Areas so far: `tss`, `py`, `quest`, `xr`,
 TSS (verified against TSS2027 commit 6293795, 2026-11-10, unless stated)
 - [tss-suit-telemetry-is-legacy-only](tss-suit-telemetry-is-legacy-only.md) — suit telemetry, position and spectrometer exist only on the old per-team ports; whole-file command 0 is gone.
 - [tss-packet-format](tss-packet-format.md) — header layout, checksum, codes, and real captured packets for tests.
-- [tss-readme-payload-sizes-wrong](tss-readme-payload-sizes-wrong.md) — README sizes for UIA, SPM, SSU are wrong; real layouts here.
+- [tss-readme-payload-sizes-wrong](tss-readme-payload-sizes-wrong.md) — README sizes for UIA, SPM, SSU are wrong; real layouts here (sizes as of 7dfc42b).
 - [tss-team-must-be-assigned](tss-team-must-be-assigned.md) — a client gets Ack 1 and no data until its IP is assigned to a group and team.
-- [tss-build-and-run](tss-build-and-run.md) — HEAD does not compile; how to build and run in WSL.
+- [tss-build-and-run](tss-build-and-run.md) — rebuild in WSL after every pull (a stale binary ignores Subscribe); build command and how to run.
 - [tss-driving-the-sim](tss-driving-the-sim.md) — how to start an EVA, flip switches, inject faults and move the astronaut from a script.
 - [tss-protocol-will-change](tss-protocol-will-change.md) — NASA says the final TSS will be WebSocket + JSON; keep all wire knowledge in one adapter.
 - [tss-map-coordinates](tss-map-coordinates.md) — map frame, image sizes, lander and task coordinates.

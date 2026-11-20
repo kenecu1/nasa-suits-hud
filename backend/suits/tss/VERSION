@@ -1,3 +1,3 @@
-6293795ca9c5805a26c0b0c841a845c8aebbe69f
+7dfc42b01358288d68fb359771e2731230c08daf
 TSS2027 commit the adapter was verified against (https://github.com/SUITS-Techteam/TSS2027).
 Packet layouts: docs/notes/tss-packet-format.md, docs/notes/tss-readme-payload-sizes-wrong.md.
