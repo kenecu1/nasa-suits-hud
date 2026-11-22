@@ -33,4 +33,5 @@ Quest and WebXR (from web research 2026-11-12, not yet checked on a device)
 WebXR emulation and end-to-end tests (verified in M1, 2026-11-16)
 - [xr-emulation-headless-works](xr-emulation-headless-works.md) — an `immersive-ar` session runs in headless Chromium with `iwer`, if `installRuntime` is forced. (Was `xr-emulation-headless-unverified`.)
 - [xr-dev-emulator-needs-one-three](xr-dev-emulator-needs-one-three.md) — the emulator control panel needs `resolve.dedupe: ["three"]`; the library's built-in emulator does not install in Chromium.
+- [xr-hud-lazy-follow](xr-hud-lazy-follow.md) — the HUD rig lags behind the head and turns only left/right; it is not head-locked.
 - [e2e-backend-link-settles-after-start](e2e-backend-link-settles-after-start.md) — the sim link takes about 3 s to reach `ok` after a backend start; tests wait for it.
