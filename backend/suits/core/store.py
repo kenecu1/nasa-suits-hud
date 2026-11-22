@@ -3,6 +3,7 @@
 Decides levels (via levels.py and data/ranges.json) and staleness. A section older than
 STALE_AFTER_S is stale: suit values keep their last number with level "stale"; switch
 positions, faults and "started" become None (unknown), because a stale switch is not a fact.
+While the link is unreachable, every suit value is stale too, whatever its own age.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from suits.contract import (
     Eva,
     Level,
     Link,
+    LinkStatus,
     Mode,
     Section,
     State,
@@ -31,7 +33,9 @@ def _fresh(snapshot: TssSnapshot, section: Section) -> bool:
 
 def suit_values(snapshot: TssSnapshot, ranges: dict[str, Any]) -> dict[str, SuitValue]:
     """Every value named in ranges.json ("ranges" and "unranged"), always all of them."""
-    fresh = _fresh(snapshot, "telemetry")
+    # Telemetry may be younger than its 4 s limit while nothing at all has been heard for 2.5 s
+    # (link unreachable). Then the values are not current either, so none of them stays green.
+    fresh = _fresh(snapshot, "telemetry") and snapshot.link != LinkStatus.UNREACHABLE
     # Before the EVA starts the TSS reads zeros, so no alarms. Only a fresh "not started"
     # silences them: unknown or stale status counts as started, so alarms stay on.
     started = not (snapshot.started is False and _fresh(snapshot, "status"))

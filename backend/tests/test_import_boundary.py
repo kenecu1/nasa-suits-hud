@@ -1,7 +1,8 @@
 """Acceptance 7: only suits/tss and suits/sim may touch TSS wire code.
 
-Everything else reads TssSnapshot (through suits.tss.source / client / recorder), so a TSS
-protocol change stays inside the adapter.
+Everything else reads TssSnapshot through an allow-list of adapter entry points (client,
+source, recorder), so a TSS protocol change stays inside the adapter. An allow-list, not a
+block-list: a new module in suits/tss (or mapping, transport, codec...) is private by default.
 """
 
 import ast
@@ -9,7 +10,8 @@ from pathlib import Path
 
 from suits.paths import REPO_ROOT
 
-FORBIDDEN = {"suits.tss.codec", "suits.tss.subscription", "suits.tss.legacy"}
+# The only suits.tss modules code outside suits/tss and suits/sim may import.
+PUBLIC = ("suits.tss.client", "suits.tss.source", "suits.tss.recorder")
 SUITS = REPO_ROOT / "backend" / "suits"
 ALLOWED_DIRS = (SUITS / "tss", SUITS / "sim")
 CHECKED = [*SUITS.rglob("*.py"), *(REPO_ROOT / "scripts").rglob("*.py")]
@@ -54,9 +56,18 @@ def violations(paths: list[Path], root: Path = BACKEND) -> list[str]:
     for path in paths:
         if any(path.is_relative_to(d) for d in ALLOWED_DIRS):
             continue
-        for module in sorted(imported_modules(path, root) & FORBIDDEN):
-            bad.append(f"{path.name} imports {module}")
+        for module in sorted(imported_modules(path, root)):
+            if _private_tss(module):
+                bad.append(f"{path.name} imports {module}")
     return bad
+
+
+def _private_tss(module: str) -> bool:
+    """True for suits.tss.<anything> that is not a public entry point or something inside one
+    (from suits.tss.source import TssSource also yields "suits.tss.source.TssSource")."""
+    if not module.startswith("suits.tss."):
+        return False
+    return not any(module == p or module.startswith(p + ".") for p in PUBLIC)
 
 
 def test_nothing_outside_tss_and_sim_imports_wire_modules():
@@ -69,15 +80,30 @@ def test_the_check_catches_each_import_style(tmp_path):
     offender.write_text(
         "from suits.tss import codec\n"
         "import suits.tss.legacy\n"
-        "from suits.tss.subscription import Subscription\n",
+        "from suits.tss.mapping import DCU_POSITIONS\n"
+        "import suits.tss.transport\n",
         encoding="utf-8",
     )
 
     assert violations([offender]) == [
         "offender.py imports suits.tss.codec",
         "offender.py imports suits.tss.legacy",
-        "offender.py imports suits.tss.subscription",
+        "offender.py imports suits.tss.mapping",
+        "offender.py imports suits.tss.mapping.DCU_POSITIONS",
+        "offender.py imports suits.tss.transport",
     ]
+
+
+def test_the_public_entry_points_are_allowed(tmp_path):
+    user = tmp_path / "user.py"
+    user.write_text(
+        "from suits.tss.source import TssSource\n"
+        "from suits.tss import client, recorder\n"
+        "import suits.tss.recorder\n",
+        encoding="utf-8",
+    )
+
+    assert violations([user]) == []
 
 
 def test_the_check_catches_relative_imports(tmp_path):
@@ -95,6 +121,7 @@ def test_the_check_catches_relative_imports(tmp_path):
     assert violations([top, deep], root=tmp_path) == [
         "offender_top.py imports suits.tss.codec",
         "offender_deep.py imports suits.tss.codec",
+        "offender_deep.py imports suits.tss.codec.decode",
         "offender_deep.py imports suits.tss.legacy",
     ]
 

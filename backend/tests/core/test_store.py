@@ -142,3 +142,11 @@ def test_elapsed_time_is_unknown_when_telemetry_is_stale():
     s = state(snapshot({}, elapsed_s=312.0, age=max(STALE_AFTER_S.values()) + 0.1))
 
     assert s.eva.elapsed_s is None
+
+
+def test_values_go_stale_as_soon_as_the_link_is_unreachable():
+    # telemetry is 3 s old (fresh by its own 4 s limit) but nothing was heard for 2.5 s
+    s = state(snapshot({"oxy_pri_storage": 92.0}, age=3.0, link=LinkStatus.UNREACHABLE))
+
+    assert s.suit.values["oxy_pri_storage"].level == Level.STALE
+    assert s.suit.values["oxy_pri_storage"].value == 92.0

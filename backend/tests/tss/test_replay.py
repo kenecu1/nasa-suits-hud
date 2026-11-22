@@ -20,7 +20,10 @@ from suits.tss.recorder import (
 )
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-RECORDINGS = sorted([FIXTURES / "captured-tss.jsonl", *RECORDINGS_DIR.glob("real-tss-*.jsonl")])
+# Listed by name, not globbed: `npm run tss:smoke -- --record` writes real-tss-<commit>.jsonl into
+# data/recordings/, and a fresh recording must not break the check before anyone chose it as a
+# fixture. To adopt one, add it here and create its golden file.
+RECORDINGS = [FIXTURES / "captured-tss.jsonl", RECORDINGS_DIR / "real-tss-6293795.jsonl"]
 
 
 def golden_path(recording: Path) -> Path:
