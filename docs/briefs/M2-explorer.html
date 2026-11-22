@@ -1,0 +1,1116 @@
+<title>M2 Alerts Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: mission-console workbench. Sticky tab rail; each tab is one instrument with its explanation beside it. */
+:root{
+  --bg:#eef1f5; --panel:#ffffff; --sunk:#e4e9f0; --ink:#15202c; --muted:#566476; --line:#cdd6e0;
+  --accent:#2a56c6; --accent-soft:#dde5fb;
+  --nom:#1d7f55; --cau:#9a5f0c; --warn:#c42d2d; --stale:#737d8a;
+  --c-ts:#2a56c6; --c-len:#7a4cc2; --c-dev:#0f7f8a; --c-code:#9a5f0c; --c-data:#1d7f55; --c-ck:#c42d2d;
+  --hud-bg:#0c131c; --hud-line:#2a3a4c; --hud-ink:#e8eef5; --hud-dim:#8796a8;
+  --hud-nom:#4fd18f; --hud-cau:#f0b84a; --hud-warn:#ff6b6b; --hud-stale:#9aa6b4;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141b; --panel:#161f29; --sunk:#1d2834; --ink:#e4eaf1; --muted:#93a1b1; --line:#2b3746;
+  --accent:#7fa2ff; --accent-soft:#1f2c4a;
+  --nom:#4cc68c; --cau:#e9b04b; --warn:#ff7070; --stale:#8d98a5;
+  --c-ts:#7fa2ff; --c-len:#b48cf0; --c-dev:#4cc3cc; --c-code:#e9b04b; --c-data:#4cc68c; --c-ck:#ff7070;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141b; --panel:#161f29; --sunk:#1d2834; --ink:#e4eaf1; --muted:#93a1b1; --line:#2b3746;
+  --accent:#7fa2ff; --accent-soft:#1f2c4a;
+  --nom:#4cc68c; --cau:#e9b04b; --warn:#ff7070; --stale:#8d98a5;
+  --c-ts:#7fa2ff; --c-len:#b48cf0; --c-dev:#4cc3cc; --c-code:#e9b04b; --c-data:#4cc68c; --c-ck:#ff7070;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{padding-block:28px 14px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(30px,5vw,44px);line-height:1.05;margin:6px 0 8px;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:600;font-size:26px;margin:0 0 6px;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:19px;margin:0 0 6px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{color:var(--muted);max-width:72ch}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-block:1px solid var(--line)}
+nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:6px}
+nav.tabs a{flex:none;font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:.02em;color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:6px}
+nav.tabs a:hover{color:var(--ink);background:var(--sunk)}
+nav.tabs a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+nav.tabs a .n{font-family:var(--f-mono);font-size:11px;opacity:.7;margin-right:6px}
+main{padding-block:22px 60px}
+section.view{display:grid;gap:18px}
+.intro{display:grid;gap:4px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.scroll{overflow-x:auto}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn,select,input[type=text]{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 12px}
+button{cursor:pointer;font-weight:500}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+label.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+pre{background:var(--sunk);border-radius:8px;padding:10px 12px;margin:8px 0 0;overflow-x:auto;font-family:var(--f-mono);font-size:12.5px;line-height:1.5}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:var(--sunk);color:var(--muted)}
+.tag.m1{background:var(--accent-soft);color:var(--accent)}
+.note{border-left:3px solid var(--accent);padding:6px 12px;background:var(--accent-soft);border-radius:0 6px 6px 0;font-size:14px}
+.note.warn{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+/* map */
+svg text{fill:var(--ink);font-family:var(--f-body)}
+.node{cursor:pointer}
+.node rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.node.m1 rect{stroke:var(--accent)}
+.node.ext rect{fill:var(--sunk)}
+.node.later rect{stroke-dasharray:5 4;fill:transparent}
+.node.later text{fill:var(--muted)}
+.node .t1{font-family:var(--f-display);font-weight:600;font-size:16px}
+.node .t2{font-size:11px;fill:var(--muted);font-family:var(--f-mono)}
+.node:hover rect{stroke-width:2.5}
+.node.sel rect{stroke:var(--accent);stroke-width:3;fill:var(--accent-soft)}
+.node.dim{opacity:.22}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.6}
+.edge.later,.edge.alt{stroke-dasharray:5 4}
+.edge.dim{opacity:.12}
+.edge.hot{stroke:var(--accent);stroke-width:2.6}
+.grp{fill:none;stroke:var(--line);stroke-dasharray:2 5}
+.grpl{font-family:var(--f-mono)!important;font-size:11px;fill:var(--muted)!important;letter-spacing:.08em}
+.pulse{fill:var(--accent)}
+/* flow */
+.lane{stroke:var(--line);stroke-width:1.2;stroke-dasharray:3 4}
+.lanehead rect{fill:var(--sunk);stroke:var(--line)}
+.lanehead text{font-family:var(--f-display);font-weight:600;font-size:13.5px}
+.msg line,.msg path{stroke:var(--muted);stroke-width:1.5;fill:none}
+.msg text{font-size:11.5px;fill:var(--muted)}
+.msg.cur line,.msg.cur path{stroke:var(--accent);stroke-width:2.6}
+.msg.cur text{fill:var(--accent);font-weight:600}
+.msg.fail line,.msg.fail path{stroke:var(--warn)}
+.msg.fail text{fill:var(--warn)}
+.stepno{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+/* packets */
+.bytes{display:flex;flex-wrap:wrap;gap:4px}
+.byte{font-family:var(--f-mono);font-size:14px;width:38px;padding:6px 0;text-align:center;border-radius:5px;border:1px solid transparent;cursor:pointer;color:var(--ink)}
+.byte small{display:block;font-size:9.5px;color:var(--muted)}
+.byte.changed{outline:2px dashed var(--warn)}
+.f-ts{background:color-mix(in srgb,var(--c-ts) 18%,transparent);border-color:color-mix(in srgb,var(--c-ts) 45%,transparent)}
+.f-len{background:color-mix(in srgb,var(--c-len) 18%,transparent);border-color:color-mix(in srgb,var(--c-len) 45%,transparent)}
+.f-dev{background:color-mix(in srgb,var(--c-dev) 18%,transparent);border-color:color-mix(in srgb,var(--c-dev) 45%,transparent)}
+.f-code{background:color-mix(in srgb,var(--c-code) 18%,transparent);border-color:color-mix(in srgb,var(--c-code) 45%,transparent)}
+.f-data{background:color-mix(in srgb,var(--c-data) 18%,transparent);border-color:color-mix(in srgb,var(--c-data) 45%,transparent)}
+.f-ck{background:color-mix(in srgb,var(--c-ck) 18%,transparent);border-color:color-mix(in srgb,var(--c-ck) 45%,transparent)}
+.f-junk{background:var(--sunk);border-color:var(--line);color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12.5px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.verdict{font-weight:600}
+.ok{color:var(--nom)} .bad{color:var(--warn)}
+table.t{border-collapse:collapse;width:100%;font-size:13.5px}
+table.t th,table.t td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+table.t td.num{font-variant-numeric:tabular-nums;font-family:var(--f-mono)}
+td.mismatch{color:var(--warn);font-weight:600;background:color-mix(in srgb,var(--warn) 9%,transparent)}
+/* HUD mock */
+.hud{background:var(--hud-bg);color:var(--hud-ink);border:1px solid var(--hud-line);border-radius:12px;padding:14px 16px;font-family:var(--f-display);min-width:0}
+.hud .lab{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--hud-dim)}
+.hud .big{font-size:38px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.hud .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-display);font-weight:700;letter-spacing:.08em;font-size:13px;padding:3px 9px;border-radius:5px;border:1.5px solid currentColor}
+.lv-nominal{color:var(--hud-nom)} .lv-caution{color:var(--hud-cau)} .lv-warning{color:var(--hud-warn)} .lv-unknown,.lv-stale{color:var(--hud-stale)}
+.lv-stale{border-style:dashed}
+.chip{font-family:var(--f-mono);font-size:12px;padding:3px 8px;border-radius:999px;border:1px solid currentColor}
+/* levels bar */
+.zone-n{fill:color-mix(in srgb,var(--nom) 26%,transparent)}
+.zone-c{fill:color-mix(in srgb,var(--cau) 30%,transparent)}
+.zone-w{fill:color-mix(in srgb,var(--warn) 24%,transparent)}
+.zone-x{fill:var(--sunk)}
+.tick{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+/* link timeline */
+.tl rect{shape-rendering:crispEdges}
+.log{font-family:var(--f-mono);font-size:12px;max-height:190px;overflow:auto;background:var(--sunk);border-radius:8px;padding:8px 10px}
+.log div{padding:1px 0}
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:860px){.cols3{grid-template-columns:minmax(0,1fr)}}
+.big-state{font-family:var(--f-display);font-weight:700;font-size:22px}
+/* rig */
+.rig svg{width:100%;max-width:440px;height:auto;display:block;margin:0 auto}
+.fov{fill:color-mix(in srgb,var(--accent) 14%,transparent);stroke:var(--accent);stroke-width:1}
+.ring{fill:none;stroke:var(--line);stroke-dasharray:3 5}
+.panelseg{stroke:var(--warn);stroke-width:7;stroke-linecap:round}
+.panelseg.in{stroke:var(--nom)}
+.head{fill:var(--panel);stroke:var(--ink);stroke-width:2}
+/* quiz */
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) 210px 28px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+@media (max-width:620px){.qrow{grid-template-columns:minmax(0,1fr) 28px}.qrow select{grid-column:1}}
+.qexp{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.files label{border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--f-mono);font-size:13px;display:flex;gap:7px;align-items:center}
+.files label.right{border-color:var(--nom);color:var(--nom)}
+.files label.wrong{border-color:var(--warn);color:var(--warn)}
+textarea{width:100%;min-height:70px;font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:8px}
+.pq{display:grid;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
+.ans{background:var(--sunk);border-radius:8px;padding:10px 12px;font-size:14px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+/* ---------- M2 additions ---------- */
+:root{
+  /* HUD palettes are always drawn on a dark backing, so they are the same in both page themes */
+  --p-text:#eef3f8; --p-label:#c3cfdb; --p-nom:#7ee8a8; --p-cau:#fcd34d; --p-warn:#ffa8a0; --p-unk:#c6cfd9; --p-stale:#d6c8ae;
+  --hl-new:color-mix(in srgb,var(--nom) 22%,transparent); --hl-chg:color-mix(in srgb,var(--cau) 26%,transparent);
+}
+.tag.m2{background:var(--accent-soft);color:var(--accent)}
+.node.m2 rect{stroke:var(--accent)}
+pre.json{white-space:pre;line-height:1.55}
+pre.json .k{color:var(--muted)}
+pre.json .ln{display:block;padding:0 4px;border-radius:3px}
+pre.json .ln.new{background:var(--hl-new)}
+pre.json .ln.chg{background:var(--hl-chg)}
+.legend i.new{background:var(--hl-new);border:1px solid var(--nom)}
+.legend i.chg{background:var(--hl-chg);border:1px solid var(--cau)}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:860px){.cols2{grid-template-columns:minmax(0,1fr)}}
+/* HUD banner mock */
+.bn{display:grid;gap:6px}
+.bn-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;background:rgba(11,17,24,.92);border:1px solid #2a3a4c;border-radius:8px;padding:7px 10px}
+.bn-row .sh{width:26px;height:26px;display:block}
+.bn-row .tt{font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.03em;line-height:1.15}
+.bn-row .ac{font-family:var(--f-body);font-size:13px;color:var(--p-text);opacity:.95}
+.bn-row .wd{font-family:var(--f-display);font-weight:700;font-size:13px;letter-spacing:.1em;text-align:right;white-space:nowrap}
+.bn-row.acked .tt,.bn-row.acked .wd{opacity:.8}
+.bn-row.stale{border-style:dashed}
+.bn-more{font-family:var(--f-display);font-weight:600;letter-spacing:.08em;color:var(--p-label);font-size:13px;padding-left:4px}
+.bn-empty{font-family:var(--f-display);letter-spacing:.08em;color:var(--p-label);font-size:14px;padding:8px 2px}
+.hudline{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--f-display);font-size:14px;letter-spacing:.04em;color:var(--p-label);margin-top:10px}
+.hudline b{font-weight:600}
+.tone{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;color:var(--hud-dim)}
+.tone.on{color:var(--p-warn)}
+.tone i{width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.35}
+.tone.on i{opacity:1;animation:blip .6s ease-out 2}
+@keyframes blip{0%{transform:scale(1.8)}100%{transform:scale(1)}}
+/* alert sim */
+.strip rect{shape-rendering:crispEdges}
+.counter{font-family:var(--f-mono);font-size:13px}
+.pill{display:inline-block;font-family:var(--f-display);font-weight:700;letter-spacing:.08em;font-size:13px;padding:2px 9px;border-radius:999px;border:1.5px solid currentColor}
+.probs{display:grid;gap:6px}
+.prob{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:5px 0}
+.prob .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.prob .seg button{border:0;border-radius:0;padding:5px 9px;font-size:13px}
+.prob .seg button.on{background:var(--accent-soft);color:var(--accent)}
+/* design preview */
+.room{position:relative;border-radius:12px;overflow:hidden;min-height:420px;border:1px solid var(--hud-line);background:radial-gradient(ellipse at 20% 85%,#2a241c 0%,transparent 55%),linear-gradient(#14171c,#07090b)}
+.room .behind{position:absolute;inset:40px 8% 60px 8%;border-radius:40% 40% 10px 10px;filter:blur(18px)}
+.room .stage{position:relative;padding:22px;display:grid;gap:12px;justify-items:center}
+.room .panel{width:min(100%,520px);border-radius:12px;padding:14px;display:grid;gap:10px}
+.lvls{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+@media (max-width:620px){.lvls{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.lvl{display:grid;justify-items:center;gap:4px;padding:6px 2px;border-radius:7px;border:1px solid rgba(255,255,255,.08)}
+.lvl svg{width:28px;height:28px}
+.lvl span{font-family:var(--f-display);font-weight:700;letter-spacing:.08em;font-size:12.5px}
+.bar{height:16px;border-radius:4px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:4px}
+.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--p-text)}
+.seg3{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg3 button{border:0;border-radius:0}
+.seg3 button.on{background:var(--accent-soft);color:var(--accent)}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--line);vertical-align:-2px;margin-right:6px}
+/* failure */
+.layers td:first-child{font-family:var(--f-mono);font-size:12.5px;white-space:nowrap}
+td.yes{color:var(--warn);font-weight:600}
+td.no{color:var(--muted)}
+</style>
+
+<header class="top wrap">
+  <div class="eyebrow">NASA SUITS HUD · milestone 2 · before building</div>
+  <h1>M2 alerts, hands on</h1>
+  <p class="lede">An interactive companion to <code>docs/briefs/M2.md</code>. Nothing here is the real code. Each tab is a small <b>model of the design</b>, so you can poke at it before a builder writes it. Ranges come from the real <code>data/ranges.json</code>. Fault behaviour, rates and NASA's action wording come from the TSS notes and NASA's TSS code at commit <code>7dfc42b</code>. Where the brief has an open decision, the model follows its recommendation and says so.</p>
+</header>
+
+<nav class="tabs" aria-label="Sections"><div class="wrap" id="tabbar"></div></nav>
+
+<main class="wrap">
+
+<!-- MESSAGES -->
+<section class="view" id="v-msgs" hidden>
+  <div class="intro">
+    <h2>Message templates</h2>
+    <p class="muted">The <code>state</code> the backend sends after M2, next to what M1 would have sent for the same moment. Pick a scenario. Lines new in M2 are green. Lines that differ from the nominal scenario are amber. Only 6 of the 23 suit values are shown; the real message always has all of them.</p>
+  </div>
+  <div class="card">
+    <div class="controls" id="msgScen"></div>
+    <div class="legend" style="margin-top:10px"><span><i class="new"></i>new field in M2</span><span><i class="chg"></i>differs from nominal</span></div>
+  </div>
+  <div class="cols2">
+    <div class="card"><div class="eyebrow">M1 state (today)</div><pre class="json" id="msgM1"></pre></div>
+    <div class="card"><div class="eyebrow">M2 state (proposed)</div><pre class="json" id="msgM2"></pre></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>What the wearer sees</h3>
+      <p class="small muted" id="msgWhy"></p>
+      <div class="hud" style="margin-top:8px"><div class="row"><span class="lab">Banner · top centre</span><span class="tone" id="msgTone"><i></i>tone</span></div><div id="msgBanner" style="margin-top:8px"></div><div class="hudline" id="msgLine"></div></div>
+    </div>
+    <div class="card">
+      <h3>The command (client → backend)</h3>
+      <p class="small muted">New in M2. The client sends the id of the alert it showed on top (decision B, recommended). <code>toggle_details</code> has no arguments.</p>
+      <pre class="json" id="msgCmd"></pre>
+      <p class="small muted" style="margin-top:8px">Backend reply: none. The answer is the next <code>state</code>, about 100 ms later.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MAP -->
+<section class="view" id="v-map" hidden>
+  <div class="intro">
+    <h2>The system map</h2>
+    <p class="muted">Click any box to see its files, its job and what it must never do. The lenses group the boxes by design rule.</p>
+  </div>
+  <div class="card">
+    <div class="controls" id="lenses" style="margin-bottom:10px"></div>
+    <div class="note small" id="lensCaption"></div>
+    <div class="scroll" style="margin-top:10px"><svg id="mapSvg" viewBox="0 0 1120 560" style="min-width:860px;width:100%;height:auto" role="img" aria-label="System map"></svg></div>
+    <div class="controls" style="margin-top:8px"><button id="pulseBtn" class="primary">▶ Send a warning out</button><button id="pulseBack">◀ Send an acknowledge back</button><span class="muted small">Animates the two directions of M2.</span></div>
+  </div>
+  <div class="card" id="nodeInfo"></div>
+</section>
+
+<!-- FLOW -->
+<section class="view" id="v-flow" hidden>
+  <div class="intro">
+    <h2>Step through an event</h2>
+    <p class="muted">The brief's event, one hop at a time: the fan fails, the banner shows the warning and its action, the wearer acknowledges, the switch fixes it. Each step shows the real payload and what goes wrong if that hop is built badly.</p>
+  </div>
+  <div class="card">
+    <div class="controls" id="scenarioBtns"></div>
+    <div class="scroll" style="margin-top:10px"><svg id="flowSvg" style="min-width:960px;width:100%;height:auto" role="img" aria-label="Sequence diagram"></svg></div>
+    <div class="controls" style="margin-top:6px">
+      <button id="flowPrev">◀ Back</button><button id="flowNext" class="primary">Next ▶</button><button id="flowPlay">Play all</button><button id="flowReset">Restart</button>
+      <span class="stepno" id="flowCount"></span>
+    </div>
+  </div>
+  <div class="card" id="flowInfo"></div>
+</section>
+
+<!-- ALERT SIM -->
+<section class="view" id="v-alerts" hidden>
+  <div class="intro">
+    <h2>Alert simulator</h2>
+    <p class="muted">A model of the AlertBook in <code>core/alerts.py</code>. One press of <b>Next sample</b> is one new telemetry arrival (decision C: about every 1.2–2.4 s on the real TSS). To raise an alert or move it up a level takes 2 samples in a row; to clear it or move it down takes 3.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>1 · One value through its range</h3>
+      <div class="controls"><select id="asSel" aria-label="Telemetry value"></select><label class="chk"><input type="checkbox" id="asHyst" checked> 2 in / 3 out</label><label class="chk"><input type="checkbox" id="asNoise"> sensor noise</label></div>
+      <svg id="asBar" viewBox="0 0 640 90" style="width:100%;height:auto;margin-top:12px" role="img" aria-label="Range bar"></svg>
+      <input type="range" id="asSlider" aria-label="Value">
+      <div class="controls" style="margin-top:8px"><button id="asStep" class="primary">Next sample</button><button id="asAuto">Auto (1 per 0.7 s)</button><button id="asAck">ack_alert</button><button id="asReset">Reset</button></div>
+      <svg id="asStrip" class="strip" viewBox="0 0 640 74" style="width:100%;height:auto;margin-top:12px" role="img" aria-label="Last 40 samples"></svg>
+      <p class="small muted">Bottom row: the level of each sample. Top row: the alert the wearer sees (hatched = acknowledged).</p>
+    </div>
+    <div class="card" style="display:grid;gap:12px">
+      <div><div class="eyebrow">This sample</div><div style="margin-top:4px" id="asNow"></div></div>
+      <div><div class="eyebrow">AlertBook memory for this rule</div><pre id="asMem"></pre></div>
+      <div><div class="eyebrow">Log</div><div class="log" id="asLog"></div></div>
+      <p class="small muted" id="asNote"></p>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>2 · Several alerts at once</h3>
+      <p class="small muted">Set each problem's level. The model raises each at once here, so you can study the <b>order</b>. The order is unacknowledged first, then warning before caution, then newest first. The banner shows 3 rows and "+N more". <b>ack_alert</b> sends the id of the top row.</p>
+      <div class="probs" id="pbList"></div>
+      <div class="controls" style="margin-top:10px"><button id="pbAck" class="primary">ack_alert (top row)</button><button id="pbClear">Clear all</button></div>
+    </div>
+    <div class="card" style="display:grid;gap:10px">
+      <div class="hud"><div class="row"><span class="lab">Banner</span><span class="tone" id="pbTone"><i></i>tone</span></div><div id="pbBanner" style="margin-top:8px"></div></div>
+      <div><div class="eyebrow">state.alerts, as sent (sorted by the backend)</div><pre class="json" id="pbJson"></pre></div>
+      <div class="log" id="pbLog"></div>
+    </div>
+  </div>
+</section>
+
+<!-- DESIGN -->
+<section class="view" id="v-design" hidden>
+  <div class="intro">
+    <h2>Low-light design preview</h2>
+    <p class="muted">A model of <code>theme.ts</code> on a dim, passthrough-like background. The panel backing is translucent, so what shows through changes the contrast (decision F). Acceptance 6 asks for at least 7:1 for every text colour, a different shape and word per level, and no text below the minimum size.</p>
+  </div>
+  <div class="card">
+    <div class="controls">
+      <span class="seg3" id="dzPal"></span>
+      <span class="small muted">Behind the panel:</span><span class="seg3" id="dzBg"></span>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <label class="small" for="dzGrey" style="min-width:150px">Brightness behind: <b id="dzGreyV"></b></label><input type="range" id="dzGrey" min="0" max="255" value="0" style="max-width:260px">
+      <label class="small" for="dzOp" style="min-width:150px">Backing opacity: <b id="dzOpV"></b></label><input type="range" id="dzOp" min="70" max="100" value="92" style="max-width:260px">
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="room" id="dzRoom">
+      <div class="behind" id="dzBehind"></div>
+      <div class="stage">
+        <div class="panel" id="dzPanel"></div>
+      </div>
+    </div>
+    <div class="card" style="display:grid;gap:12px">
+      <div><div class="eyebrow">Contrast against the backing as composited</div><table class="t" id="dzContrast" style="margin-top:6px"></table></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Text sizes at panel distance</h3>
+    <p class="small muted">dmm is an angle: 1 dmm = 1 mm seen from 1 m. Size in mm = dmm × distance in m. The panel uses 1 px = 1 mm, so px = mm. M1's sizes were in px, which makes their dmm shrink as the panel moves away. Minimum: 24 dmm.</p>
+    <div class="controls"><label class="small" for="dzDist">Panel distance: <b id="dzDistV"></b></label><input type="range" id="dzDist" min="80" max="200" value="120" style="max-width:300px"></div>
+    <div class="scroll"><table class="t" id="dzSizes" style="margin-top:8px"></table></div>
+  </div>
+</section>
+
+<!-- FAILURES -->
+<section class="view" id="v-fail" hidden>
+  <div class="intro">
+    <h2>Failure simulator</h2>
+    <p class="muted">Break one thing and see which layer notices, what it does, what the wearer sees and which test catches it. A model of the design with the brief's recommendations (decisions A and B, the Origin check), not the real code.</p>
+  </div>
+  <div class="card"><div class="controls" id="flBtns"></div></div>
+  <div class="grid2">
+    <div class="card">
+      <h3 id="flTitle"></h3>
+      <p id="flWhat"></p>
+      <div class="scroll"><table class="t layers" id="flLayers" style="margin-top:6px"></table></div>
+      <div class="note small" style="margin-top:10px" id="flTest"></div>
+    </div>
+    <div class="card" style="display:grid;gap:10px">
+      <div class="hud"><div class="row"><span class="lab">What the wearer sees</span><span class="tone" id="flTone"><i></i>tone</span></div><div id="flBanner" style="margin-top:8px"></div><div class="hudline" id="flLine"></div></div>
+      <div><div class="eyebrow">The payload that broke</div><pre class="json" id="flPayload"></pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- QUIZ -->
+<section class="view" id="v-quiz" hidden>
+  <div class="intro">
+    <h2>Check yourself</h2>
+    <p class="muted">Three drills. Your written answers stay in this browser only.</p>
+  </div>
+  <div class="card">
+    <h3>1 · Where does this job live?</h3>
+    <div id="q1"></div>
+    <div class="controls" style="margin-top:10px"><button id="q1Check" class="primary">Check</button><span id="q1Score" class="verdict"></span></div>
+  </div>
+  <div class="card">
+    <h3>2 · Which files change if…</h3>
+    <div class="controls" id="q2Scen" style="margin-top:6px"></div>
+    <p style="margin-top:10px" id="q2Q"></p>
+    <div class="files" id="q2" style="margin-top:8px"></div>
+    <div class="controls" style="margin-top:10px"><button id="q2Check" class="primary">Check</button><span id="q2Score" class="verdict"></span></div>
+    <p class="small muted" id="q2Exp" hidden></p>
+  </div>
+  <div class="card">
+    <h3>3 · Predict before you read the code</h3>
+    <p class="small muted">The questions from section 10 of the brief. Write your answer first, then reveal.</p>
+    <div id="q3"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+function s(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs = {}, html) { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- tabs ---------- */
+const TABS = [['msgs', 'Message templates'], ['map', 'System map'], ['flow', 'Event stepper'], ['alerts', 'Alert simulator'], ['design', 'Low-light design'], ['fail', 'Failure simulator'], ['quiz', 'Check yourself']];
+const bar = $('#tabbar');
+TABS.forEach(([id, label], i) => { const a = h('a', { href: '#' + id }, `<span class="n">${i + 1}</span>${label}`); a.dataset.id = id; bar.appendChild(a); });
+function show() {
+  let id = location.hash.slice(1); if (!TABS.some(t => t[0] === id)) id = 'msgs';
+  TABS.forEach(([t]) => { $('#v-' + t).hidden = t !== id; });
+  bar.querySelectorAll('a').forEach(a => { if (a.dataset.id === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (id !== 'alerts') asStopAuto();
+}
+window.addEventListener('hashchange', show);
+
+/* ---------- real data: data/ranges.json ---------- */
+const RANGES = {
+  primary_battery_level: [20, 100, 'low', '%'], secondary_battery_level: [20, 100, 'low', '%'],
+  oxy_pri_storage: [20, 100, 'low', '%'], oxy_sec_storage: [20, 100, 'low', '%'],
+  oxy_pri_pressure: [600, 3000, 'low', 'psi'], oxy_sec_pressure: [600, 3000, 'low', 'psi'],
+  coolant_storage: [80, 100, 'low', '%'], heart_rate: [50, 160, 'both', 'bpm'],
+  oxy_consumption: [0.05, 0.15, 'both', 'psi/min'], co2_production: [0.05, 0.15, 'both', 'psi/min'],
+  suit_pressure_oxy: [3.5, 4.1, 'both', 'psi'], suit_pressure_co2: [0.0, 0.1, 'high', 'psi'],
+  suit_pressure_other: [0.0, 0.5, 'high', 'psi'], suit_pressure_total: [3.5, 4.5, 'both', 'psi'],
+  helmet_pressure_co2: [0.0, 0.15, 'high', 'psi'], fan_pri_rpm: [29000, 31000, 'both', 'rpm'],
+  fan_sec_rpm: [29000, 31000, 'both', 'rpm'], scrubber_a_co2_storage: [0, 60, 'high', '%'],
+  scrubber_b_co2_storage: [0, 60, 'high', '%'], temperature: [10, 32, 'both', '°C'],
+  coolant_liquid_pressure: [100, 700, 'both', 'psi'], coolant_gas_pressure: [0, 700, 'high', 'psi'],
+};
+const MARGIN = 0.10;
+function classify(v, [mn, mx, chk]) {
+  if (v == null || !isFinite(v)) return 'unknown';
+  const band = (mx - mn) * MARGIN, lo = chk !== 'high', hi = chk !== 'low';
+  if ((lo && v < mn) || (hi && v > mx)) return 'warning';
+  if ((lo && v <= mn + band) || (hi && v >= mx - band)) return 'caution';
+  return 'nominal';
+}
+/* alert rules, as proposed for data/alerts.json (decision D, recommended) */
+const RULES = {
+  fan: { title: v => `FAN ${v}`, action: 'DCU FAN to SEC, return to lander', inputs: 'active fan rpm (dcu.fan picks), faults.fan, helmet_pressure_co2' },
+  oxygen: { action: 'DCU OXY to SEC, return to lander', inputs: 'suit_pressure_oxy, faults.oxy' },
+  co2: { action: 'Flip DCU CO2 (vent the scrubber)', inputs: 'suit_pressure_co2, active scrubber, faults.scrubber' },
+  battery: { action: 'Switch to secondary battery', inputs: 'primary_battery_level, faults.power' },
+  heart_rate: { action: 'Slow down', inputs: 'heart_rate' },
+  temperature: { action: 'Slow down', inputs: 'temperature' },
+  other: { action: 'Check details, report to LMCC', inputs: 'any ranged value with no NASA action' },
+  link: { action: 'Values frozen. Check TSS link', inputs: 'link.tss' },
+  data: { action: 'Missing values show NO DATA. Check TSS version', inputs: 'TssSnapshot.missing' },
+};
+const RULE_OF = { fan_pri_rpm: 'fan', fan_sec_rpm: 'fan', helmet_pressure_co2: 'fan', suit_pressure_oxy: 'oxygen', suit_pressure_co2: 'co2', scrubber_a_co2_storage: 'co2', scrubber_b_co2_storage: 'co2', primary_battery_level: 'battery', heart_rate: 'heart_rate', temperature: 'temperature' };
+const SHORT = { fan_pri_rpm: 'FAN PRI', fan_sec_rpm: 'FAN SEC', helmet_pressure_co2: 'HELMET CO2', suit_pressure_oxy: 'SUIT O2', suit_pressure_co2: 'SUIT CO2', scrubber_a_co2_storage: 'SCRUBBER A', scrubber_b_co2_storage: 'SCRUBBER B', primary_battery_level: 'BATTERY PRI', secondary_battery_level: 'BATTERY SEC', heart_rate: 'HEART RATE', temperature: 'TEMP', oxy_pri_storage: 'O2 PRI', oxy_sec_storage: 'O2 SEC', coolant_storage: 'COOLANT' };
+
+/* ---------- palette + level styles (proposed theme.ts) ---------- */
+const PAL = {
+  m1: { name: 'M1 today', backing: '#0b1118', op: 0.88, text: '#e8eef5', label: '#9fb0c2', nominal: '#4ade80', caution: '#facc15', warning: '#f87171', unknown: '#94a3b8', stale: '#b8a58c' },
+  m2: { name: 'M2 proposed', backing: '#0b1118', op: 0.92, text: '#eef3f8', label: '#c3cfdb', nominal: '#7ee8a8', caution: '#fcd34d', warning: '#ffa8a0', unknown: '#c6cfd9', stale: '#d6c8ae' },
+};
+const LOOK = { nominal: ['circle', 'NOMINAL'], caution: ['diamond', 'CAUTION'], warning: ['triangle', 'WARNING'], unknown: ['ring', 'NO DATA'], stale: ['square', 'STALE'] };
+function shapeSvg(shape, color, outline) {
+  const f = outline ? `fill="none" stroke="${color}" stroke-width="2.2"` : `fill="${color}"`;
+  const body = { circle: `<circle cx="12" cy="12" r="9" ${f}/>`, diamond: `<path d="M12 2 L22 12 L12 22 L2 12Z" ${f}/>`, triangle: `<path d="M12 2.5 L22.5 21 H1.5Z" ${f}/>`, ring: `<circle cx="12" cy="12" r="7.5" fill="none" stroke="${color}" stroke-width="3"/>`, square: `<rect x="4" y="4" width="16" height="16" ${f}/>` }[shape];
+  return `<svg viewBox="0 0 24 24" class="sh" aria-hidden="true">${body}</svg>`;
+}
+const P2 = PAL.m2;
+function bannerHtml(alerts, opts = {}) {
+  const pal = opts.pal || P2;
+  if (!alerts || !alerts.length) return `<div class="bn-empty">NO ALERTS</div>`;
+  const rows = alerts.slice(0, 3).map(a => {
+    const lv = opts.stale ? 'stale' : a.severity, col = pal[lv], [shape, word] = LOOK[lv];
+    return `<div class="bn-row${a.acked ? ' acked' : ''}${opts.stale ? ' stale' : ''}">${shapeSvg(shape, col, a.acked)}<div><div class="tt" style="color:${col}">${esc(a.title)}</div><div class="ac">${esc(a.action)}</div></div><div class="wd" style="color:${col}">${word}${a.acked ? '<br>ACK' : ''}</div></div>`;
+  }).join('');
+  const more = alerts.length > 3 ? `<div class="bn-more">+${alerts.length - 3} MORE</div>` : '';
+  return `<div class="bn">${rows}${more}</div>`;
+}
+function sortAlerts(list) {
+  const r = { warning: 2, caution: 1 };
+  return list.slice().sort((a, b) => (a.acked - b.acked) || (r[b.severity] - r[a.severity]) || (b.since - a.since));
+}
+
+/* ---------- JSON pretty printer with highlights ---------- */
+function jsonLines(obj, newPaths, base) {
+  const out = [];
+  const isNew = p => newPaths.some(n => p === n || p.startsWith(n + '.'));
+  const get = (o, p) => p.split('.').reduce((x, k) => (x == null ? undefined : x[k]), o);
+  const differs = p => base && JSON.stringify(get(base, p)) !== JSON.stringify(get(obj, p));
+  function walk(v, p, key, ind, last) {
+    const pad = '  '.repeat(ind), comma = last ? '' : ',', k = key == null ? '' : `<span class="k">"${esc(key)}"</span>: `;
+    const cls = p && isNew(p) ? ' new' : p && differs(p) ? ' chg' : '';
+    const compact = v && typeof v === 'object' && (p.split('.').length >= 3 || (Array.isArray(v) && !v.length) || p === 'link' || p === 'eva' || p === 'ui' || p === 'suit.faults' || p === 'dcu' || p === 'uia' || p === 'args');
+    if (v && typeof v === 'object' && !compact) {
+      const arr = Array.isArray(v);
+      out.push(`<span class="ln${cls}">${pad}${k}${arr ? '[' : '{'}</span>`);
+      const ks = arr ? v.map((_, i) => i) : Object.keys(v);
+      ks.forEach((kk, i) => walk(v[kk], p ? p + '.' + kk : String(kk), arr ? null : kk, ind + 1, i === ks.length - 1));
+      out.push(`<span class="ln${cls}">${pad}${arr ? ']' : '}'}${comma}</span>`);
+    } else {
+      let txt = JSON.stringify(v);
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        txt = '{' + Object.keys(v).map(kk => {
+          const sp = p + '.' + kk, inner = `"${esc(kk)}":${esc(JSON.stringify(v[kk]))}`;
+          return isNew(sp) && !isNew(p) ? `<mark style="background:var(--hl-new);color:inherit">${inner}</mark>` : differs(sp) && !differs(p) ? inner : inner;
+        }).join(', ') + '}';
+        out.push(`<span class="ln${cls}">${pad}${k}${txt}${comma}</span>`); return;
+      }
+      out.push(`<span class="ln${cls}">${pad}${k}${esc(txt)}${comma}</span>`);
+    }
+  }
+  walk(obj, '', null, 0, true);
+  return out.join('');
+}
+
+/* ---------- 1. MESSAGES ---------- */
+const T0 = 1763801312.4;
+function baseState() {
+  return {
+    type: 'state', v: 2, seq: 812, t: T0,
+    link: { tss: 'ok', age_s: 0.4, mode: 'sim', level: 'nominal' },
+    eva: { started: true, elapsed_s: 1312.0, phase: null },
+    suit: {
+      values: {
+        oxy_pri_storage: { value: 92.0, unit: '%', level: 'nominal' },
+        primary_battery_level: { value: 86.0, unit: '%', level: 'nominal' },
+        heart_rate: { value: 92.0, unit: 'bpm', level: 'nominal' },
+        fan_pri_rpm: { value: 30000.0, unit: 'rpm', level: 'nominal' },
+        fan_sec_rpm: { value: 0.0, unit: 'rpm', level: 'nominal' },
+        scrubber_a_co2_storage: { value: 22.0, unit: '%', level: 'nominal' },
+      },
+      faults: { fan: false, oxy: false, power: false, scrubber: false },
+    },
+    dcu: { batt: 'LOCAL', oxy: 'PRI', comm: 'A', fan: 'PRI', pump: 'CLOSED', co2: 'A' },
+    uia: { eva_power: 'OFF', o2_supply: 'CLOSED', water_supply: 'CLOSED', water_waste: 'CLOSED', o2_vent: 'CLOSED', depress: 'CLOSED' },
+    alerts: [],
+    ui: { details_open: false },
+  };
+}
+const FAN = { id: 'fan', severity: 'warning', title: 'FAN PRI 21500 RPM', action: RULES.fan.action, since: 1763801309.1, acked: false };
+const MSG = {
+  nominal: { name: 'Nominal', why: 'Everything in range. The banner is empty, and the rest of the HUD shows values in their nominal look.', tone: false, f: s => s },
+  caution: { name: 'Caution', why: 'Primary battery at 26%: inside the range, but within 10% of the 20% limit (20 + 0.10 × 80 = 28). A caution alert with its action. Cautions never play the tone.', tone: false, f: s => {
+    s.suit.values.primary_battery_level = { value: 26.0, unit: '%', level: 'caution' };
+    s.alerts = [{ id: 'battery', severity: 'caution', title: 'BATTERY PRI 26%', action: RULES.battery.action, since: 1763801290.0, acked: false }]; return s; } },
+  warning: { name: 'Warning', why: 'The fan fault from the brief: the primary fan winds down and the fault flag is set. One rule, one row, NASA\'s action. A new warning plays the tone once.', tone: true, f: s => {
+    s.suit.values.fan_pri_rpm = { value: 21500.0, unit: 'rpm', level: 'warning' }; s.suit.faults.fan = true; s.alerts = [{ ...FAN }]; return s; } },
+  two: { name: 'Two alerts at once', why: 'The fan warning, then the scrubber passes 60%. Both are unacknowledged warnings, so the newer one (co2) goes on top. ack_alert would acknowledge "co2".', tone: true, f: s => {
+    s.suit.values.fan_pri_rpm = { value: 21500.0, unit: 'rpm', level: 'warning' }; s.suit.faults.fan = true;
+    s.suit.values.scrubber_a_co2_storage = { value: 63.0, unit: '%', level: 'warning' }; s.suit.faults.scrubber = true;
+    s.alerts = sortAlerts([{ ...FAN }, { id: 'co2', severity: 'warning', title: 'SCRUBBER A 63%', action: RULES.co2.action, since: 1763801311.9, acked: false }]); return s; } },
+  acked: { name: 'Acknowledged', why: 'The wearer pressed ack_alert. The alert stays listed until the fan recovers, in its acknowledged look (outline shape, ACK), and the tone stays quiet.', tone: false, f: s => {
+    s.suit.values.fan_pri_rpm = { value: 18900.0, unit: 'rpm', level: 'warning' }; s.suit.faults.fan = true; s.alerts = [{ ...FAN, title: 'FAN PRI 18900 RPM', acked: true }]; s.seq = 815; return s; } },
+  link: { name: 'Link lost', why: 'Nothing valid from the TSS for 2.5 s. Exactly one alert (the link). Every suit value is stale but keeps its last number. No suit alerts come from old data, so the fan alert is gone until fresh samples raise it again.', tone: true, f: s => {
+    s.link = { tss: 'unreachable', age_s: 3.1, mode: 'sim', level: 'warning' };
+    for (const k in s.suit.values) s.suit.values[k].level = 'stale';
+    s.alerts = [{ id: 'link', severity: 'warning', title: 'TSS LINK LOST', action: RULES.link.action, since: 1763801311.0, acked: false }]; return s; } },
+  missing: { name: 'Field missing', why: 'NASA renamed oxy_pri_storage. Decision A, option 2: the other values stay, the missing one is unknown (NO DATA), the link says bad_data, and one caution names the field. tss:smoke exits 1.', tone: false, f: s => {
+    s.link = { tss: 'bad_data', age_s: 0.4, mode: 'sim', level: 'warning' };
+    s.suit.values.oxy_pri_storage = { value: null, unit: '%', level: 'unknown' };
+    s.alerts = [{ id: 'data', severity: 'caution', title: 'TSS DATA: 1 FIELD MISSING', action: 'oxy_pri_storage shows NO DATA. Check TSS version', since: 1763801300.0, acked: false }]; return s; } },
+};
+const NEW_PATHS = ['alerts', 'ui', 'link.level'];
+function toM1(st) { const c = JSON.parse(JSON.stringify(st)); delete c.alerts; delete c.ui; delete c.link.level; return c; }
+let msgK = 'warning';
+const msgBox = $('#msgScen');
+for (const k in MSG) { const b = h('button', {}, MSG[k].name); b.dataset.k = k; b.addEventListener('click', () => { msgK = k; renderMsg(); }); msgBox.appendChild(b); }
+function hudLine(st) {
+  const v = st.suit.values, o = v.oxy_pri_storage, lv = l => `<b style="color:${P2[l]}">`;
+  const conn = st.link.level === 'nominal' ? 'TSS OK' : 'TSS ' + st.link.tss.toUpperCase().replace('_', ' ');
+  return `<span>O2 PRI ${lv(o.level)}${o.value == null ? '--' : Math.floor(o.value) + '%'} ${LOOK[o.level][1]}</b></span><span>FAN ${st.dcu.fan}</span><span>LINK ${lv(st.link.level)}${conn}</b></span>`;
+}
+function renderMsg() {
+  msgBox.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === msgK));
+  const base = baseState(), st = MSG[msgK].f(baseState());
+  $('#msgM1').innerHTML = jsonLines(toM1(st), [], toM1(base));
+  $('#msgM2').innerHTML = jsonLines(st, NEW_PATHS, base);
+  $('#msgWhy').textContent = MSG[msgK].why;
+  $('#msgBanner').innerHTML = bannerHtml(st.alerts, { stale: false });
+  $('#msgLine').innerHTML = hudLine(st);
+  $('#msgTone').classList.toggle('on', MSG[msgK].tone);
+  const top = st.alerts.find(a => !a.acked) || st.alerts[0];
+  const cmd = top ? { type: 'command', name: 'ack_alert', args: { id: top.id } } : { type: 'command', name: 'ack_alert', args: {} };
+  $('#msgCmd').innerHTML = jsonLines(cmd, ['type', 'name', 'args'], null) + '<span class="ln"> </span>' + jsonLines({ type: 'command', name: 'toggle_details', args: {} }, ['type', 'name', 'args'], null);
+  store.set('m2x.msg', msgK);
+}
+msgK = store.get('m2x.msg', 'warning'); if (!MSG[msgK]) msgK = 'warning';
+renderMsg();
+
+/* ---------- 2. MAP ---------- */
+const NW = 170, NH = 58;
+const NODES = {
+  tss: { x: 18, y: 92, cls: 'ext', label: 'NASA TSS', sub: 'or sim/fake_tss', title: 'NASA TSS (or the fake TSS)', files: ['vendor/TSS2027 (NASA)', 'backend/suits/sim/fake_tss.py'], does: 'Sends suit telemetry, status and fault flags on the legacy ports, and DCU/UIA on the binary protocol. Unchanged in M2.', never: '—', tests: [] },
+  sim: { x: 18, y: 262, cls: 'm2', label: 'sim/dynamics', sub: '+ scenarios, NEW', title: 'Fault rules and scenario player', files: ['backend/suits/sim/dynamics.py', 'backend/suits/sim/scenarios.py', 'data/scenarios/fan_failure.yaml', 'data/scenarios/o2_leak.yaml', 'data/scenarios/link_loss.yaml'], does: 'Applies the TSS\'s intended fault rules to the fake each tick (fan winds down on PRI, recovers on SEC; O2 pressure drifts on PRI; the filling scrubber rises; battery below 20% on LOCAL sets the power fault). Plays timed value and fault changes.', never: 'Import from core/. Run against a real TSS.', tests: [5] },
+  src: { x: 228, y: 92, cls: 'm2', label: 'tss/source + mapping', sub: 'expected names, CHANGED', title: 'TSS adapter: source and mapping', files: ['backend/suits/tss/mapping.py', 'backend/suits/tss/source.py'], does: 'Decodes, keeps arrival times, works out link.tss. New: compares telemetry keys with the expected names ("our names", today equal to NASA\'s), reports missing ones, sets bad_data while any are missing, and counts arrivals per section.', never: 'Decide a level or an alert.', tests: [] },
+  pub: { x: 448, y: 92, cls: '', label: 'core/publisher', sub: '100 ms gather, 1 s beat', title: 'Publisher', files: ['backend/suits/core/publisher.py'], does: 'Unchanged. Gathers changes for 100 ms, sends at least once a second, skips a send if nothing visible changed. Alerts are part of "visible", so a new alert or an ack is sent at once.', never: 'Hold mission logic.', tests: [] },
+  app: { x: 700, y: 92, cls: 'm2', label: 'app.py /ws', sub: 'Origin check, read loop', title: 'WebSocket endpoint', files: ['backend/suits/app.py'], does: 'New: refuses a socket whose Origin is not allowed (before accept). Reads each text frame and hands it to core/commands. Still sends the State queue.', never: 'Parse or act on a command itself.', tests: [10, 11] },
+  store: { x: 448, y: 232, cls: 'm2', label: 'core/store + levels', sub: 'adds alerts, link.level', title: 'State builder', files: ['backend/suits/core/store.py', 'backend/suits/core/levels.py'], does: 'Builds State from the snapshot: levels (unchanged), staleness, and now alerts from the AlertBook, link.level and ui.details_open.', never: 'Change the AlertBook in preview(). Keep counters of its own.', tests: [1, 4] },
+  alerts: { x: 700, y: 232, cls: 'm2', label: 'core/alerts', sub: 'AlertBook, NEW', title: 'AlertBook', files: ['backend/suits/core/alerts.py'], does: 'Turns levels, fault flags and link status into alerts using data/alerts.json. 2 samples in, 3 out. Keeps since and acked, sorts the list, decides severity. Advances only on a new arrival.', never: 'Read a socket or its own clock. Know TSS packet layouts.', tests: [2, 3, 4, 5] },
+  cmd: { x: 700, y: 372, cls: 'm2', label: 'core/commands', sub: 'parse + dispatch, NEW', title: 'Command handler', files: ['backend/suits/core/commands.py', 'backend/suits/contract.py (Command)'], does: 'Validates a command against the Command model. ack_alert → AlertBook.ack(id). toggle_details → flips ui.details_open. Then notify_change. Unknown or malformed commands are logged and dropped.', never: 'Touch the socket. Trust a field it did not validate.', tests: [3, 10] },
+  data: { x: 448, y: 372, cls: 'm2', label: 'data/', sub: 'ranges.json + alerts.json', title: 'Data files', files: ['data/ranges.json (unchanged)', 'data/alerts.json (new)'], does: 'Ranges decide levels. Alert rules group inputs into problems, with a title and NASA\'s action text. Editing a rule needs no code change.', never: 'Contain code.', tests: [1, 3] },
+  net: { x: 934, y: 22, cls: 'm2', label: 'net/link', sub: '+ send(command)', title: 'Client socket', files: ['client/src/net/link.ts', 'client/src/net/parse.ts'], does: 'Reconnect and watchdog as before. New: send(command) while the socket is open. Drops it while offline (no queue).', never: 'Change state on its own after sending.', tests: [10, 11] },
+  zs: { x: 934, y: 112, cls: '', label: 'store.ts', sub: 'state + prev state', title: 'Client store', files: ['client/src/store.ts'], does: 'Keeps the last State and the one before (for the tone), the connection status, and the view models.', never: 'Merge or edit a State.', tests: [] },
+  vm: { x: 934, y: 202, cls: 'm2', label: 'hud/*.vm.ts', sub: 'banner, vitals, details…', title: 'View models', files: ['client/src/hud/banner.vm.ts', 'consumables.vm.ts', 'vitals.vm.ts', 'switches.vm.ts', 'details.vm.ts', 'clock.vm.ts', 'tone.vm.ts', 'link.vm.ts (now maps link.level)', 'layout.ts'], does: 'Pure functions: state in, text and look out. Map severity and level to the theme. Take the first 3 alerts in the order sent and add "+N more".', never: 'Compare a value with a limit. Re-sort alerts. Decide a severity (the one exception: the client\'s own offline state).', tests: [7, 8] },
+  scene: { x: 934, y: 292, cls: 'm2', label: 'scene/ panels', sub: 'banner, bars, tone', title: 'Scene components', files: ['client/src/scene/AlertBanner.tsx', 'ConsumablesPanel.tsx', 'VitalsPanel.tsx', 'SwitchPanel.tsx', 'DetailsPage.tsx', 'EvaClock.tsx', 'Tone.tsx'], does: 'Draw one view model each, in WebGL, placed by the rig. Tone plays a short Web Audio tone when its flag turns true.', never: 'Listen to keys or buttons. Use a literal colour or size.', tests: [9, 12] },
+  theme: { x: 934, y: 382, cls: 'm2', label: 'theme.ts', sub: 'dmm, low-light palette', title: 'Theme', files: ['client/src/theme.ts'], does: 'Sizes in dmm (minimum 24), palette, translucent backing, one style per level (colour + shape + word).', never: 'Know about alerts or values.', tests: [6] },
+  input: { x: 934, y: 472, cls: 'm2', label: 'input/intents', sub: 'key + XR button tables', title: 'Input → intent', files: ['client/src/input/intents.ts', 'client/src/input/keyboard.ts', 'client/src/input/XrButtons.tsx', 'client/src/xr.ts (controllers on)'], does: 'One binding table per device: KeyA → ack_alert, KeyD → toggle_details; controller a-button → ack_alert, b-button → toggle_details. Turns an intent into a command.', never: 'Change what is shown directly.', tests: [10, 11] },
+};
+const EDGES = [['sim', 'tss'], ['tss', 'src', 'both'], ['src', 'pub'], ['pub', 'store'], ['data', 'store'], ['data', 'alerts'], ['alerts', 'store'], ['pub', 'app'], ['app', 'net'], ['net', 'zs'], ['zs', 'vm'], ['vm', 'scene'], ['theme', 'vm', 'side'], ['input', 'net', 'back'], ['app', 'cmd', 'back'], ['cmd', 'alerts', 'back'], ['cmd', 'pub', 'alt']];
+const LENSES = [
+  ['all', 'Everything', null, 'Blue outline = new or changed in M2. Grey = keeps its M1 job.'],
+  ['new', 'New in M2', ['sim', 'src', 'app', 'store', 'alerts', 'cmd', 'data', 'net', 'vm', 'scene', 'theme', 'input'], 'New or changed in M2. The AlertBook, commands, dynamics and input are new files. The adapter, app.py, store and the client socket change a little.'],
+  ['pure', 'Pure functions', ['src', 'store', 'alerts', 'data', 'vm', 'theme'], 'Tested with no socket, GPU or browser. The AlertBook keeps memory, but all of it is in the value passed in and out, so pytest feeds it samples one by one.'],
+  ['sev', 'Where severity is decided', ['store', 'alerts', 'data'], 'Levels in core/levels.py with ranges.json. Alert severity, order and link.level in core/alerts.py and core/store.py with alerts.json. View models only map them to the theme. The single exception is the client\'s own offline state.'],
+  ['headset', 'Runs in the headset', ['net', 'zs', 'vm', 'scene', 'theme', 'input'], 'What runs on the Quest: a thin display plus the input tables. It decides nothing about the mission.'],
+];
+const mapSvg = $('#mapSvg');
+s('defs', {}, mapSvg).innerHTML = '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>';
+s('rect', { class: 'grp', x: 212, y: 64, width: 678, height: 386, rx: 14 }, mapSvg);
+s('text', { class: 'grpl', x: 226, y: 56 }, mapSvg).textContent = 'BACKEND · PYTHON ON THE LAPTOP';
+s('rect', { class: 'grp', x: 920, y: 10, width: 196, height: 540, rx: 14 }, mapSvg);
+s('text', { class: 'grpl', x: 926, y: 554 }, mapSvg).textContent = 'CLIENT · BROWSER / QUEST';
+function anchor(a, b) {
+  const A = NODES[a], B = NODES[b];
+  const ax = A.x + NW / 2, ay = A.y + NH / 2, bx = B.x + NW / 2, by = B.y + NH / 2;
+  if (Math.abs(bx - ax) >= Math.abs(by - ay) * 1.2) {
+    const x1 = bx > ax ? A.x + NW : A.x, x2 = bx > ax ? B.x : B.x + NW;
+    const mx = (x1 + x2) / 2; return `M${x1},${ay} C${mx},${ay} ${mx},${by} ${x2},${by}`;
+  }
+  const y1 = by > ay ? A.y + NH : A.y, y2 = by > ay ? B.y : B.y + NH;
+  const my = (y1 + y2) / 2; return `M${ax},${y1} C${ax},${my} ${bx},${my} ${bx},${y2}`;
+}
+const edgeEls = {};
+EDGES.forEach(([a, b, kind]) => {
+  let d = anchor(a, b);
+  if (kind === 'side') { const A = NODES[a], B = NODES[b]; const x = A.x + NW; d = `M${x},${A.y + NH / 2} C${x + 30},${A.y + NH / 2} ${x + 30},${B.y + NH / 2} ${x},${B.y + NH / 2}`; }
+  if (a === 'input' && b === 'net') { const A = NODES.input, B = NODES.net; const x = A.x; d = `M${x},${A.y + NH / 2} C${x - 26},${A.y} ${x - 26},${B.y + NH} ${x},${B.y + NH / 2 + 10}`; }
+  const p = s('path', { d, class: 'edge' + (kind === 'alt' ? ' alt' : '') + (kind === 'back' ? ' alt' : ''), 'marker-end': 'url(#arr)' }, mapSvg);
+  if (kind === 'both') p.setAttribute('marker-start', 'url(#arr)');
+  edgeEls[a + '-' + b] = p;
+});
+const nodeEls = {};
+for (const id in NODES) {
+  const n = NODES[id];
+  const g = s('g', { class: 'node ' + n.cls, tabindex: 0, role: 'button', 'aria-label': n.title }, mapSvg);
+  s('rect', { x: n.x, y: n.y, width: NW, height: NH, rx: 9 }, g);
+  s('text', { x: n.x + 12, y: n.y + 25, class: 't1' }, g).textContent = n.label;
+  s('text', { x: n.x + 12, y: n.y + 44, class: 't2' }, g).textContent = n.sub;
+  g.addEventListener('click', () => selectNode(id));
+  g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNode(id); } });
+  nodeEls[id] = g;
+}
+s('text', { x: 560, y: 470, class: 'tick', 'text-anchor': 'middle' }, mapSvg).textContent = 'dashed arrows = the new return path (command, notify_change)';
+function selectNode(id) {
+  if (!NODES[id]) id = 'alerts';
+  for (const k in nodeEls) nodeEls[k].classList.toggle('sel', k === id);
+  const n = NODES[id];
+  const status = n.cls === 'ext' ? '<span class="tag">external</span>' : n.cls === 'm2' ? '<span class="tag m2">new or changed in M2</span>' : '<span class="tag">unchanged from M1</span>';
+  $('#nodeInfo').innerHTML = `<div class="controls" style="justify-content:space-between"><h3 style="margin:0">${esc(n.title)}</h3>${status}</div>
+  <dl class="kv" style="margin-top:10px"><dt>Files</dt><dd class="mono">${n.files.map(esc).join('<br>')}</dd>
+  <dt>Its job</dt><dd>${esc(n.does)}</dd><dt>Never</dt><dd>${esc(n.never)}</dd>
+  <dt>Proved by</dt><dd>${n.tests.length ? 'acceptance ' + n.tests.join(', ') : '—'}</dd></dl>`;
+  store.set('m2x.node', id);
+}
+const lensBox = $('#lenses');
+function applyLens(id) {
+  const L = LENSES.find(l => l[0] === id) || LENSES[0], set = L[2];
+  lensBox.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.id === L[0]));
+  for (const k in nodeEls) nodeEls[k].classList.toggle('dim', !!set && !set.includes(k));
+  for (const k in edgeEls) { const [a, c] = k.split('-'); edgeEls[k].classList.toggle('dim', !!set && !(set.includes(a) && set.includes(c))); }
+  $('#lensCaption').textContent = L[3];
+}
+LENSES.forEach(([id, label]) => { const b = h('button', {}, label); b.dataset.id = id; b.addEventListener('click', () => applyLens(id)); lensBox.appendChild(b); });
+applyLens('all');
+selectNode(store.get('m2x.node', 'alerts'));
+let pulsing = false;
+function pulse(path) {
+  if (pulsing) return; pulsing = true;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i = 0;
+  const step = () => {
+    Object.values(edgeEls).forEach(e => e.classList.remove('hot'));
+    if (i >= path.length) { pulsing = false; return; }
+    const e = edgeEls[path[i]]; e.classList.add('hot');
+    const c = s('circle', { r: 6, class: 'pulse' }, mapSvg);
+    const len = e.getTotalLength(), dur = reduce ? 1 : 420, t0 = performance.now();
+    const anim = now => { const k = Math.min(1, (now - t0) / dur), p = e.getPointAtLength(len * k); c.setAttribute('cx', p.x); c.setAttribute('cy', p.y); if (k < 1) requestAnimationFrame(anim); else { c.remove(); i++; step(); } };
+    requestAnimationFrame(anim);
+  };
+  step();
+}
+$('#pulseBtn').addEventListener('click', () => pulse(['sim-tss', 'tss-src', 'src-pub', 'pub-store', 'alerts-store', 'pub-app', 'app-net', 'net-zs', 'zs-vm', 'vm-scene']));
+$('#pulseBack').addEventListener('click', () => pulse(['input-net', 'app-net', 'app-cmd', 'cmd-alerts', 'cmd-pub', 'pub-app', 'app-net', 'net-zs', 'zs-vm', 'vm-scene']));
+
+/* ---------- 3. FLOW ---------- */
+const P = ['scenario + dynamics', 'fake TSS', 'tss/ source', 'publisher', 'store + alerts', 'app.py /ws', 'net + store.ts', 'view models', 'scene', 'input/'];
+const SCEN = {
+  fan: { name: 'Fan fails → banner → acknowledge → fix', steps: [
+    { f: 0, t: 1, l: 'fan fault on', p: 'data/scenarios/fan_failure.yaml\n- at: 5\n  fault: fan\n\nsim/dynamics.py, each tick while dcu.fan = PRI:\n  fan_pri_rpm 30000 → 21500 → 17200 … (winding down)\n  error.fan_error = true', x: 'The scenario player turns the fan fault on. Each tick, sim/dynamics.py applies the TSS\'s own fault rule. It is copied into our fake because NASA\'s rule is switched off at commit 7dfc42b.', b: 'The scenario writes fan_pri_rpm = 0 directly, with no rule behind it. Flipping the switch can then never fix it, and acceptance 5 can only pass by scripting the recovery too.' },
+    { f: 2, t: 1, l: 'GET telemetry', p: '<ts u32> 00000001  → UDP 14142 + team', x: 'Unchanged from M1: one legacy request at a time, because the TSS answers about one request per 1.2 s per team port.', b: '' },
+    { f: 1, t: 2, l: 'JSON, 23 names', p: '{"primary_battery_level":86.0, "oxy_pri_storage":92.0, …,\n "fan_pri_rpm":21500.0, "fan_sec_rpm":0.0, …, "heart_rate":92.0,\n "eva_elapsed_time":1310}', x: 'A flat object with the 22 ranged names and eva_elapsed_time. Only the active fan spins, so fan_sec_rpm is 0 while dcu.fan is PRI.', b: '' },
+    { f: 2, t: 2, l: 'names check, arrival #812', p: 'expected = 23 names (tss/mapping.py, "our names")\nmissing  = []\nTssSnapshot(arrivals={"telemetry": 812, "faults": 97, …}, missing=[])', x: 'mapping compares the keys with our expected list. All present. The section gets the next arrival number, which is how the AlertBook knows this is a new sample.', b: 'Treating an absent key like a non-number (None): a renamed field becomes a quiet NO DATA while the link says OK. That is the M1 deep-review finding (decision A).' },
+    { f: 2, t: 3, l: 'on_change', p: 'publisher.notify_change()', x: 'The publisher waits 100 ms so the rest of the burst arrives, then builds one State.', b: '' },
+    { f: 3, t: 4, l: 'sample 1 of 2', p: 'levels: fan_pri_rpm 21500 < 29000 → "warning"\nAlertBook.step(arrival 812): rule "fan" off-nominal, streak 1/2\n→ no alert yet', x: 'Levels are decided exactly as in M1. The AlertBook sees a new telemetry arrival and counts one bad sample. One is not enough.', b: 'Advancing the AlertBook on every preview() or heartbeat: the same reading counts twice, so "2 samples" can be one sample and hysteresis is fake.' },
+    { f: 1, t: 2, l: 'next telemetry, #813', p: '{"fan_pri_rpm":17200.0, …}', x: 'About 1.2–2.4 s later, the next telemetry reply.', b: '' },
+    { f: 3, t: 4, l: 'sample 2 of 2 → raise', p: '{"id":"fan","severity":"warning","title":"FAN PRI 17200 RPM",\n "action":"DCU FAN to SEC, return to lander",\n "since":1763801311.6,"acked":false}', x: 'The rule "fan" in data/alerts.json raises one alert. Its id is the rule id, so it stays the same across snapshots. The action text is NASA\'s.', b: 'An id built from the value or the time ("fan-17200"): it changes every sample, the acknowledge is lost and the tone plays again every second.' },
+    { f: 4, t: 5, l: 'State (full)', p: '{"type":"state","v":2,"seq":813,\n "link":{"tss":"ok",…,"level":"nominal"},\n "alerts":[{"id":"fan",…,"acked":false}],\n "ui":{"details_open":false}, …}', x: 'The alerts list is part of what the publisher compares, so the change goes out at once instead of waiting for the 1 s heartbeat.', b: 'A ticking "age" inside each alert: every tick becomes a change and the publisher\'s skip-if-unchanged stops working. Send since; the client works out the age.' },
+    { f: 5, t: 6, l: 'JSON text', p: 'parseState: type "state", v 2 ✓\nstore.ts: prev = seq 812, state = seq 813', x: 'The client keeps the previous State too, so the tone view model can see what is new.', b: '' },
+    { f: 6, t: 7, l: 'buildHud(state, prev)', p: 'banner.vm → rows: [{ text: "FAN PRI 17200 RPM",\n  action: "DCU FAN to SEC, return to lander",\n  look: theme.level.warning  // triangle, WARNING, colour\n  acked: false }], more: 0\ntone.vm → true   (warning id "fan" not in prev)', x: 'The view model takes the first 3 alerts in the order sent and maps severity to the theme.', b: 'The view model re-sorts or re-decides severity: the banner order can then differ from what ack_alert acts on.' },
+    { f: 7, t: 8, l: 'draw + tone', p: 'AlertBanner: one row, top centre\nTone: short tone (Web Audio), once', x: 'The tone is driven by the flag. The browser only allows audio after a user gesture: the Enter AR click or the first key press unlocks it.', b: 'Playing the tone inside the component on every render: it beeps every second while the warning lasts.' },
+    { f: 9, t: 6, l: 'intent ack_alert', p: 'keyboard table:   KeyA        → "ack_alert"\ncontroller table: "a-button"  → "ack_alert"\nbanner top id = "fan"', x: 'The wearer presses A. One table per device turns the key or button into the same intent.', b: 'A key listener inside AlertBanner.tsx: it works on the laptop, nothing happens in the headset, and voice (M6) needs a third copy.' },
+    { f: 6, t: 5, l: 'command', p: '{"type":"command","name":"ack_alert","args":{"id":"fan"}}', x: 'net/link.ts sends it on the open socket. That socket passed the Origin check when it connected.', b: 'No Origin check: any web page open on the laptop could send this. Browsers do not apply CORS to WebSockets.' },
+    { f: 5, t: 4, l: 'dispatch → ack', p: 'Command.model_validate_json(text) ✓\ncommands.dispatch → AlertBook.ack("fan")\npublisher.notify_change()', x: 'The backend is the only thing that changes state.', b: 'Acking "whatever is on top now": if an O2 warning arrived 50 ms earlier, the wearer silences a warning they never saw (decision B).' },
+    { f: 4, t: 5, l: 'State, acked', p: '"alerts":[{"id":"fan",…,"acked":true}]', x: 'About 100 ms after the key press.', b: '' },
+    { f: 5, t: 6, l: 'JSON text', p: '{"seq":815, "alerts":[{"id":"fan",…,"acked":true}], …}', x: '', b: '' },
+    { f: 7, t: 8, l: 'acknowledged look', p: 'banner row: outline triangle, WARNING + ACK\ntone.vm → false', x: 'The alert stays listed until the problem clears. The client never marked it on its own.', b: 'Optimistic marking in the client: after a reconnect, or if the command was dropped, the HUD shows an acknowledge the backend never got.' },
+    { f: 0, t: 1, l: 'DCU FAN → SEC', p: 'dcu.fan = SEC   (the wearer flips it; the scenario does it at t = 25)\ndynamics: fan_sec_rpm 30000, error.fan_error = false', x: 'The fix NASA\'s document recommends. The primary fan stays at 0.', b: '' },
+    { f: 4, t: 4, l: 'active fan ×3 → clear', p: 'rule "fan" watches fan_sec_rpm  (dcu.fan = SEC)\n30000 nominal: streak 1/3, 2/3, 3/3 → alert removed', x: 'Three nominal samples in a row clear it (about 3.6–7 s).', b: 'Watching fan_pri_rpm: it reads 0 forever after the switch, so the alert never clears. Acceptance 5 catches this.' },
+  ] },
+  race: { name: 'Acknowledge races a new warning (decision B)', steps: [
+    { f: 4, t: 5, l: 'State: fan on top', p: '"alerts":[{"id":"fan","severity":"warning",…,"acked":false}]', x: 'The fan warning is on the banner.', b: '' },
+    { f: 7, t: 8, l: 'banner: FAN', p: 'top row: FAN PRI 17200 RPM', x: 'This is what the wearer sees.', b: '' },
+    { f: 1, t: 2, l: 'telemetry', p: '{"suit_pressure_oxy":3.1, …}  second bad sample', x: 'Meanwhile the oxygen pressure has been low for two samples.', b: '' },
+    { f: 4, t: 4, l: 'raise "oxygen"', p: 'newest unacknowledged warning → goes on top', x: 'The backend now has oxygen on top. The State is about to be sent.', b: '' },
+    { f: 9, t: 6, l: 'press A', p: 'banner still shows "fan" on top\n→ intent ack_alert, id "fan"', x: 'The wearer reacts to what they saw: the fan.', b: '' },
+    { f: 6, t: 5, l: 'command', p: '{"type":"command","name":"ack_alert","args":{"id":"fan"}}', x: 'The id travels with the command.', b: '' },
+    { f: 5, t: 4, l: 'ack "fan"', p: 'option 2: ack id "fan" (still active) ✓\noption 1 would ack the top: "oxygen" ✗', x: 'With the id, the backend acknowledges what the wearer saw. Without it, the oxygen warning would be silenced before anyone read it.', b: 'Option 1 (no id): the wearer acknowledges a warning they never saw.', fail: false },
+    { f: 4, t: 5, l: 'State', p: '"alerts":[\n  {"id":"oxygen","severity":"warning",…,"acked":false},\n  {"id":"fan","severity":"warning",…,"acked":true}]', x: 'Oxygen on top, unacknowledged. Fan below, acknowledged, still listed.', b: '' },
+    { f: 7, t: 8, l: 'banner + tone', p: 'top: SUIT O2 3.1 PSI · DCU OXY to SEC, return to lander\nsecond: FAN (ACK)\ntone.vm → true ("oxygen" is new)', x: 'The next press of A acknowledges oxygen.', b: '' },
+  ] },
+};
+let scen = 'fan', fi = 0, playTimer = null;
+const sbox = $('#scenarioBtns');
+for (const k in SCEN) { const b = h('button', {}, SCEN[k].name); b.dataset.k = k; b.addEventListener('click', () => { scen = k; fi = 0; stopPlay(); drawFlow(); }); sbox.appendChild(b); }
+const LW = 100, L0 = 62, Y0 = 92, GAP = 34;
+function drawFlow() {
+  sbox.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === scen));
+  const st = SCEN[scen].steps, W = L0 * 2 + LW * (P.length - 1), H = Y0 + GAP * st.length + 10;
+  const svg = $('#flowSvg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = '';
+  s('defs', {}, svg).innerHTML = '<marker id="farr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>';
+  P.forEach((name, i) => {
+    const x = L0 + i * LW;
+    s('line', { x1: x, y1: 56, x2: x, y2: H - 6, class: 'lane' }, svg);
+    const g = s('g', { class: 'lanehead' }, svg);
+    s('rect', { x: x - 48, y: 14, width: 96, height: 38, rx: 7 }, g);
+    const t = s('text', { x, y: 38, 'text-anchor': 'middle', style: 'font-size:12px' }, g); t.textContent = name;
+  });
+  st.forEach((m, i) => {
+    if (i > fi) return;
+    const y = Y0 + i * GAP, x1 = L0 + m.f * LW, x2 = L0 + m.t * LW;
+    const g = s('g', { class: 'msg' + (i === fi ? ' cur' : '') + (m.fail ? ' fail' : '') }, svg);
+    g.style.cursor = 'pointer'; g.addEventListener('click', () => { fi = i; stopPlay(); drawFlow(); });
+    if (m.f === m.t) {
+      s('path', { d: `M${x1},${y} h34 v14 h-32`, 'marker-end': 'url(#farr)' }, g);
+      const t = s('text', { x: x1 + 40, y: y + 4 }, g); t.textContent = m.l;
+    } else {
+      const dir = x2 > x1 ? 1 : -1;
+      s('line', { x1, y1: y, x2: x2 - dir * 3, y2: y, 'marker-end': 'url(#farr)' }, g);
+      const t = s('text', { x: (x1 + x2) / 2, y: y - 6, 'text-anchor': 'middle' }, g); t.textContent = m.l;
+    }
+  });
+  const m = st[fi];
+  $('#flowCount').textContent = `step ${fi + 1} of ${st.length}`;
+  $('#flowPrev').disabled = fi === 0; $('#flowNext').disabled = fi === st.length - 1;
+  $('#flowInfo').innerHTML = `<div class="stepno">${esc(P[m.f])} → ${esc(P[m.t])}</div><h3 style="margin-top:2px">${esc(m.l)}</h3>
+    ${m.x ? `<p>${esc(m.x)}</p>` : ''}${m.p ? `<pre>${esc(m.p)}</pre>` : ''}
+    ${m.b ? `<div class="note warn" style="margin-top:10px"><b>If this hop is built badly:</b> ${esc(m.b)}</div>` : ''}`;
+}
+function stopPlay() { clearInterval(playTimer); playTimer = null; $('#flowPlay').textContent = 'Play all'; }
+$('#flowPrev').addEventListener('click', () => { stopPlay(); if (fi > 0) fi--; drawFlow(); });
+$('#flowNext').addEventListener('click', () => { stopPlay(); if (fi < SCEN[scen].steps.length - 1) fi++; drawFlow(); });
+$('#flowReset').addEventListener('click', () => { stopPlay(); fi = 0; drawFlow(); });
+$('#flowPlay').addEventListener('click', () => {
+  if (playTimer) return stopPlay();
+  if (fi >= SCEN[scen].steps.length - 1) fi = 0;
+  $('#flowPlay').textContent = 'Pause'; drawFlow();
+  playTimer = setInterval(() => { if (fi >= SCEN[scen].steps.length - 1) return stopPlay(); fi++; drawFlow(); }, 1700);
+});
+drawFlow();
+
+/* ---------- 4. ALERT SIM: one value ---------- */
+const RANK = { nominal: 0, caution: 1, warning: 2 }, SEV = [null, 'caution', 'warning'];
+const asSel = $('#asSel');
+Object.keys(RANGES).forEach(k => asSel.appendChild(h('option', { value: k }, k)));
+let AS;
+function asLimits(k) { const [mn, mx] = RANGES[k], span = mx - mn; let lo = mn - span * 0.5, hi = mx + span * 0.5; if (mn >= 0) lo = Math.max(0, lo); return [lo, hi, span]; }
+function asReset() {
+  const k = asSel.value, [lo, hi] = asLimits(k), [mn, mx, chk] = RANGES[k];
+  AS = { k, sev: 0, acked: false, since: null, up: 0, upMin: 3, down: 0, downMax: -1, n: 0, hist: [], log: [] };
+  const sl = $('#asSlider'); sl.min = lo; sl.max = hi; sl.step = (hi - lo) / 400;
+  sl.value = chk === 'low' ? mn + (mx - mn) * 0.6 : chk === 'high' ? mn + (mx - mn) * 0.4 : (mn + mx) / 2;
+  asDrawBar(); asRender();
+}
+function fmt(v, k) { const [mn, mx] = RANGES[k], span = mx - mn; const d = span >= 1000 ? 0 : span >= 10 ? 1 : span >= 1 ? 2 : 3; return (+v).toFixed(d); }
+function asDrawBar() {
+  const k = AS.k, [lo, hi] = asLimits(k), [mn, mx, chk] = RANGES[k], band = (mx - mn) * MARGIN, svg = $('#asBar');
+  const X = v => 20 + (v - lo) / (hi - lo) * 600;
+  svg.innerHTML = '';
+  const zone = (a, b, c) => { if (b > a) s('rect', { x: X(a), y: 18, width: X(b) - X(a), height: 30, class: c }, svg); };
+  const lowChk = chk !== 'high', highChk = chk !== 'low';
+  zone(lo, mn, lowChk ? 'zone-w' : 'zone-x'); zone(mn, mn + band, lowChk ? 'zone-c' : 'zone-n'); zone(mn + band, mx - band, 'zone-n'); zone(mx - band, mx, highChk ? 'zone-c' : 'zone-n'); zone(mx, hi, highChk ? 'zone-w' : 'zone-x');
+  [mn, mx].forEach(v => { s('line', { x1: X(v), x2: X(v), y1: 12, y2: 54, stroke: 'var(--ink)', 'stroke-width': 1.5 }, svg); s('text', { x: X(v), y: 70, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = fmt(v, k) + ' ' + RANGES[k][3]; });
+  AS.marker = s('path', { d: '', fill: 'var(--accent)' }, svg);
+  s('text', { x: 20, y: 86, class: 'tick' }, svg).textContent = `check: ${chk} · caution band ${fmt(band, k)} ${RANGES[k][3]} (10% of the range)`;
+  asMoveMarker();
+}
+function asMoveMarker() { const [lo, hi] = asLimits(AS.k), v = +$('#asSlider').value, x = 20 + (v - lo) / (hi - lo) * 600; AS.marker.setAttribute('d', `M${x - 7},4 L${x + 7},4 L${x},16 Z`); }
+function asLog(m) { AS.log.unshift(`#${String(AS.n).padStart(3)}  ${m}`); AS.log = AS.log.slice(0, 40); }
+function asStep() {
+  const k = AS.k, [, , span] = asLimits(k);
+  let v = +$('#asSlider').value;
+  if ($('#asNoise').checked) v += (Math.random() * 2 - 1) * span * 0.04;
+  const lv = classify(v, RANGES[k]), r = RANK[lv], hyst = $('#asHyst').checked, upN = hyst ? 2 : 1, downN = hyst ? 3 : 1;
+  AS.n++;
+  if (r > AS.sev) { AS.up++; AS.upMin = Math.min(AS.upMin, r); AS.down = 0; AS.downMax = -1;
+    if (AS.up >= upN) { const prev = AS.sev; AS.sev = AS.upMin; AS.up = 0; AS.upMin = 3;
+      if (prev === 0) { AS.since = AS.n; AS.acked = false; asLog(`RAISE ${SEV[AS.sev]} (tone${AS.sev === 2 ? '' : ' only for warnings'})`); }
+      else { AS.acked = false; asLog(`ESCALATE to ${SEV[AS.sev]}: unacknowledged again, tone`); } }
+  } else if (r < AS.sev) { AS.down++; AS.downMax = Math.max(AS.downMax, r); AS.up = 0; AS.upMin = 3;
+    if (AS.down >= downN) { const to = AS.downMax; AS.down = 0; AS.downMax = -1;
+      if (to === 0) { asLog(`CLEAR after ${downN} nominal sample${downN > 1 ? 's' : ''}`); AS.sev = 0; AS.acked = false; AS.since = null; }
+      else { asLog(`DOWNGRADE to ${SEV[to]} (ack kept)`); AS.sev = to; } }
+  } else { AS.up = 0; AS.upMin = 3; AS.down = 0; AS.downMax = -1; }
+  AS.hist.push({ lv, sev: AS.sev, acked: AS.acked, v }); AS.hist = AS.hist.slice(-40);
+  AS.last = { v, lv };
+  asRender();
+}
+function asRender() {
+  const k = AS.k, svg = $('#asStrip'); svg.innerHTML = '';
+  const col = { nominal: 'var(--nom)', caution: 'var(--cau)', warning: 'var(--warn)' };
+  s('defs', {}, svg).innerHTML = '<pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--panel)"/><rect width="3" height="6" fill="currentColor"/></pattern>';
+  s('text', { x: 0, y: 22, class: 'tick' }, svg).textContent = 'alert';
+  s('text', { x: 0, y: 56, class: 'tick' }, svg).textContent = 'level';
+  AS.hist.forEach((hh, i) => {
+    const x = 44 + i * 14.9;
+    s('rect', { x, y: 44, width: 13, height: 18, rx: 2, fill: col[hh.lv], opacity: .85 }, svg);
+    if (hh.sev) { const c = col[SEV[hh.sev]]; const r = s('rect', { x, y: 10, width: 14.9, height: 18, fill: hh.acked ? 'url(#hatch)' : c, style: `color:${c}` }, svg); if (hh.acked) r.setAttribute('stroke', c); }
+  });
+  const v = AS.last ? AS.last.v : +$('#asSlider').value, lv = AS.last ? AS.last.lv : classify(v, RANGES[k]);
+  const sevName = SEV[AS.sev];
+  $('#asNow').innerHTML = `<span class="counter">${esc(k)} = <b>${fmt(v, k)} ${RANGES[k][3]}</b></span> → level <span class="pill" style="color:var(--${lv === 'nominal' ? 'nom' : lv === 'caution' ? 'cau' : 'warn'})">${lv.toUpperCase()}</span><br><span class="small muted">Alert: ${sevName ? `<b>${sevName}</b>${AS.acked ? ', acknowledged' : ', not acknowledged'}` : 'none'}</span>`;
+  const rule = RULE_OF[k] || 'other';
+  $('#asMem').textContent = `rule:      "${rule}"  (data/alerts.json)\nseverity:  ${sevName || '—'}\nacked:     ${AS.acked}\nsince:     ${AS.since == null ? '—' : 'sample #' + AS.since}\nup streak:   ${AS.up} / ${$('#asHyst').checked ? 2 : 1}   (samples worse than the alert)\ndown streak: ${AS.down} / ${$('#asHyst').checked ? 3 : 1}   (samples better than the alert)\nlast arrival counted: #${AS.n}`;
+  $('#asLog').innerHTML = AS.log.map(l => `<div>${esc(l)}</div>`).join('') || '<div class="muted">Press Next sample.</div>';
+  $('#asAck').disabled = !AS.sev || AS.acked;
+  const notes = { fan_pri_rpm: 'Real TSS: only the active fan spins. The proposed rule watches the fan dcu.fan names, so a 0 on the inactive fan raises nothing.', fan_sec_rpm: 'Real TSS: fan_sec_rpm is 0 while dcu.fan is PRI. The proposed rule only checks it after the switch to SEC.', heart_rate: 'Real TSS: heart rate follows the temperature sine wave, about 145–160 bpm, so it sits in caution (149 and up) much of the time. Turn on noise near 149 and turn off 2 in / 3 out to see flapping.', primary_battery_level: 'Real TSS drain: 0.05 %/s (3 %/min), so about 27 minutes from 100% to 20%.' };
+  $('#asNote').textContent = notes[k] || 'Edges come from data/ranges.json. A value exactly on min or max is caution, not warning.';
+  asMoveMarker();
+}
+let asTimer = null;
+function asStopAuto() { if (asTimer) { clearInterval(asTimer); asTimer = null; $('#asAuto').textContent = 'Auto (1 per 0.7 s)'; } }
+asSel.addEventListener('change', () => { asStopAuto(); asReset(); store.set('m2x.asSel', asSel.value); });
+$('#asSlider').addEventListener('input', asMoveMarker);
+$('#asStep').addEventListener('click', asStep);
+$('#asReset').addEventListener('click', () => { asStopAuto(); asReset(); });
+$('#asAck').addEventListener('click', () => { if (AS.sev && !AS.acked) { AS.acked = true; asLog('ack_alert: acknowledged, stays listed until it clears'); if (AS.hist.length) AS.hist[AS.hist.length - 1].acked = true; asRender(); } });
+$('#asAuto').addEventListener('click', () => { if (asTimer) return asStopAuto(); $('#asAuto').textContent = 'Stop'; asTimer = setInterval(asStep, 700); });
+$('#asHyst').addEventListener('change', asRender);
+asSel.value = RANGES[store.get('m2x.asSel', 'fan_pri_rpm')] ? store.get('m2x.asSel', 'fan_pri_rpm') : 'fan_pri_rpm';
+asReset();
+
+/* ---------- 4b. several alerts ---------- */
+const PROBS = [
+  ['fan', 'Fan', 'FAN PRI 17200 RPM', 'FAN PRI 29150 RPM'],
+  ['oxygen', 'Suit O2 pressure', 'SUIT O2 3.1 PSI', 'SUIT O2 3.55 PSI'],
+  ['co2', 'Scrubber / CO2', 'SCRUBBER A 63%', 'SCRUBBER A 56%'],
+  ['battery', 'Battery', 'BATTERY PRI 17%', 'BATTERY PRI 26%'],
+  ['heart_rate', 'Heart rate', 'HEART RATE 168 BPM', 'HEART RATE 152 BPM'],
+  ['temperature', 'Temperature', 'TEMP 33.0 °C', 'TEMP 30.2 °C'],
+];
+let PB = { list: [], clock: 100, log: [] };
+const pbList = $('#pbList');
+PROBS.forEach(([id, name]) => {
+  const row = h('div', { class: 'prob' });
+  row.innerHTML = `<div><b>${esc(name)}</b><div class="small muted">${esc(RULES[id].action)}</div></div><span class="seg" role="group" aria-label="${esc(name)} level"><button data-l="off" class="on">off</button><button data-l="caution">caution</button><button data-l="warning">warning</button></span>`;
+  row.querySelectorAll('button').forEach(b => b.addEventListener('click', () => pbSet(id, b.dataset.l)));
+  row.dataset.id = id; pbList.appendChild(row);
+});
+function pbLog(m) { PB.log.unshift(m); PB.log = PB.log.slice(0, 12); }
+let pbTone = false;
+function pbSet(id, l) {
+  const p = PROBS.find(x => x[0] === id), cur = PB.list.find(a => a.id === id);
+  PB.clock += 1; pbTone = false;
+  if (l === 'off') { if (cur) { PB.list = PB.list.filter(a => a !== cur); pbLog(`clear "${id}"`); } }
+  else if (!cur) { PB.list.push({ id, severity: l, title: l === 'warning' ? p[2] : p[3], action: RULES[id].action, since: PB.clock, acked: false }); pbLog(`raise "${id}" ${l}`); pbTone = l === 'warning'; }
+  else if (cur.severity !== l) { const up = l === 'warning'; cur.severity = l; cur.title = up ? p[2] : p[3]; if (up) { cur.acked = false; pbTone = true; pbLog(`escalate "${id}" to warning: unacknowledged again`); } else pbLog(`downgrade "${id}" to caution (ack kept)`); }
+  pbRender();
+}
+function pbRender() {
+  PB.list = sortAlerts(PB.list);
+  pbList.querySelectorAll('.prob').forEach(r => { const a = PB.list.find(x => x.id === r.dataset.id), l = a ? a.severity : 'off'; r.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.l === l)); });
+  $('#pbBanner').innerHTML = bannerHtml(PB.list);
+  $('#pbJson').innerHTML = PB.list.length ? jsonLines(PB.list.map(a => ({ id: a.id, severity: a.severity, since: +(T0 - 100 + a.since).toFixed(1), acked: a.acked })), [], null) : '[]';
+  $('#pbTone').classList.remove('on'); if (pbTone) { void $('#pbTone').offsetWidth; $('#pbTone').classList.add('on'); }
+  const top = PB.list[0];
+  $('#pbAck').disabled = !top || top.acked;
+  $('#pbAck').textContent = top && !top.acked ? `ack_alert {id: "${top.id}"}` : 'ack_alert (nothing to acknowledge)';
+  $('#pbLog').innerHTML = PB.log.map(l => `<div>${esc(l)}</div>`).join('') || '<div class="muted">Set a problem to caution or warning.</div>';
+}
+$('#pbAck').addEventListener('click', () => { const top = PB.list[0]; if (top && !top.acked) { top.acked = true; pbTone = false; pbLog(`ack_alert {id:"${top.id}"} → acknowledged, sinks below unacknowledged alerts`); pbRender(); } });
+$('#pbClear').addEventListener('click', () => { PB.list = []; pbTone = false; pbLog('all clear'); pbRender(); });
+pbSet('fan', 'warning'); pbSet('heart_rate', 'caution'); PB.log = []; pbTone = false; pbRender();
+
+/* ---------- 5. DESIGN ---------- */
+const hex = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16));
+const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+const lum = rgb => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const mix = (a, b, o) => a.map((x, i) => x * o + b[i] * (1 - o));
+let DZ = { pal: 'm2', grey: 0, op: 92, dist: 120 };
+const dzPal = $('#dzPal'), dzBg = $('#dzBg');
+Object.keys(PAL).forEach(k => { const b = h('button', {}, PAL[k].name); b.dataset.k = k; b.addEventListener('click', () => { DZ.pal = k; DZ.op = Math.round(PAL[k].op * 100); $('#dzOp').value = DZ.op; dzRender(); }); dzPal.appendChild(b); });
+[['Dim room', 0], ['Grey wall', 128], ['Lamp', 255]].forEach(([n, g]) => { const b = h('button', {}, n); b.dataset.g = g; b.addEventListener('click', () => { DZ.grey = g; $('#dzGrey').value = g; dzRender(); }); dzBg.appendChild(b); });
+$('#dzGrey').addEventListener('input', e => { DZ.grey = +e.target.value; dzRender(); });
+$('#dzOp').addEventListener('input', e => { DZ.op = +e.target.value; dzRender(); });
+$('#dzDist').addEventListener('input', e => { DZ.dist = +e.target.value; dzSizes(); });
+function dzRender() {
+  const pal = PAL[DZ.pal], op = DZ.op / 100, g = DZ.grey, behind = [g, g, g], back = mix(hex(pal.backing), behind, op);
+  dzPal.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === DZ.pal));
+  dzBg.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.g === g));
+  $('#dzGreyV').textContent = `${g} / 255`; $('#dzOpV').textContent = op.toFixed(2);
+  $('#dzBehind').style.background = `rgb(${g},${g},${g})`;
+  const [br, bgc, bb] = hex(pal.backing);
+  const panel = $('#dzPanel'); panel.style.background = `rgba(${br},${bgc},${bb},${op})`; panel.style.border = '1px solid rgba(255,255,255,.10)';
+  const alerts = [
+    { severity: 'warning', title: 'FAN PRI 17200 RPM', action: RULES.fan.action, acked: false },
+    { severity: 'caution', title: 'BATTERY PRI 26%', action: RULES.battery.action, acked: false },
+    { severity: 'warning', title: 'SCRUBBER A 63%', action: RULES.co2.action, acked: true },
+  ];
+  const rows = alerts.map(a => { const col = pal[a.severity], [shape, word] = LOOK[a.severity]; return `<div class="bn-row${a.acked ? ' acked' : ''}" style="background:transparent;border-color:rgba(255,255,255,.12)">${shapeSvg(shape, col, a.acked)}<div><div class="tt" style="color:${col}">${esc(a.title)}</div><div class="ac" style="color:${pal.text}">${esc(a.action)}</div></div><div class="wd" style="color:${col}">${word}${a.acked ? '<br>ACK' : ''}</div></div>`; }).join('');
+  const lvls = Object.keys(LOOK).map(l => `<div class="lvl">${shapeSvg(LOOK[l][0], pal[l]).replace('class="sh"', '')}<span style="color:${pal[l]}">${LOOK[l][1]}</span></div>`).join('');
+  const barRow = (lab, val, pct, thr, lv) => `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 64px;gap:8px;align-items:center"><span style="font-family:var(--f-display);letter-spacing:.08em;font-size:13px;color:${pal.label}">${lab}</span><div class="bar"><i style="width:${pct}%;background:${pal[lv]}"></i><b style="left:${thr}%;background:${pal.text}"></b></div><span style="font-family:var(--f-display);font-weight:700;color:${pal[lv]};text-align:right">${val}</span></div>`;
+  panel.innerHTML = `<div style="font-family:var(--f-display);letter-spacing:.12em;font-size:12px;color:${pal.label}">ALERTS · TOP CENTRE</div><div class="bn">${rows}</div>
+    <div style="font-family:var(--f-display);letter-spacing:.12em;font-size:12px;color:${pal.label};margin-top:4px">LEVELS · COLOUR + SHAPE + WORD</div><div class="lvls">${lvls}</div>
+    <div style="font-family:var(--f-display);letter-spacing:.12em;font-size:12px;color:${pal.label};margin-top:4px">CONSUMABLES · BAR + THRESHOLD MARK</div>
+    ${barRow('O2 PRI', '92%', 92, 20, 'nominal')}${barRow('BATT PRI', '26%', 26, 20, 'caution')}${barRow('SCRUB A', '63%', 63, 60, 'warning')}`;
+  const names = [['text', 'Text, actions'], ['label', 'Labels'], ['nominal', 'Nominal'], ['caution', 'Caution'], ['warning', 'Warning'], ['unknown', 'No data'], ['stale', 'Stale']];
+  const bk = back.map(Math.round);
+  $('#dzContrast').innerHTML = `<tr><th>Colour</th><th class="num">Ratio</th><th>7:1</th></tr>` + names.map(([k, n]) => { const r = ratio(hex(pal[k]), back); return `<tr><td><span class="sw" style="background:${pal[k]}"></span>${n} <span class="mono muted small">${pal[k]}</span></td><td class="num">${r.toFixed(2)}</td><td class="${r >= 7 ? 'ok' : 'bad'} verdict">${r >= 7 ? 'pass' : 'fail'}</td></tr>`; }).join('')
+    + `<tr><td colspan="3" class="small muted">Backing as seen: rgb(${bk.join(', ')}) = ${pal.backing} at ${op.toFixed(2)} over grey ${g}. Ratio = (L1 + 0.05) ÷ (L2 + 0.05), relative luminance as in WCAG.</td></tr>`;
+}
+const SIZES_M2 = [['Banner title', 32], ['Banner action', 28], ['Row text, level word', 28], ['Panel label', 24], ['Details page row', 24], ['Big value', 48]];
+const SIZES_M1 = [['label (M1)', 18], ['row, word (M1)', 22], ['value (M1)', 56]];
+function dzSizes() {
+  const d = DZ.dist / 100; $('#dzDistV').textContent = d.toFixed(2) + ' m';
+  const row = (n, dmm, fixedPx) => { const mm = fixedPx != null ? fixedPx : dmm * d, dm = fixedPx != null ? fixedPx / d : dmm; return `<tr><td>${esc(n)}</td><td class="num">${dm.toFixed(1)}</td><td class="num">${mm.toFixed(1)}</td><td class="num">${mm.toFixed(1)}</td><td class="${dm >= 24 ? 'ok' : 'bad'} verdict">${dm >= 24 ? 'ok' : 'too small'}</td></tr>`; };
+  $('#dzSizes').innerHTML = `<tr><th>Text (proposed theme.ts)</th><th class="num">dmm</th><th class="num">mm tall at ${d.toFixed(2)} m</th><th class="num">panel px</th><th>≥ 24 dmm</th></tr>`
+    + SIZES_M2.map(([n, v]) => row(n, v)).join('')
+    + `<tr><th colspan="5">M1 today (sizes fixed in px)</th></tr>` + SIZES_M1.map(([n, px]) => row(n, null, px)).join('');
+}
+dzRender(); dzSizes();
+
+/* ---------- 6. FAILURES ---------- */
+const LAYERS_F = ['TSS / fake', 'tss/mapping + source', 'core/store + levels', 'core/alerts', 'app.py /ws', 'core/commands', 'client net', 'view models + scene'];
+function stateWith(fn) { return fn(baseState()); }
+const FAILS = {
+  missing: { name: 'Missing field', what: 'The TSS reply has 22 of the 23 expected names: oxy_pri_storage is absent.',
+    layers: [['no', 'sends what it sends'], ['yes', 'expected-name check: missing = ["oxy_pri_storage"]. Keeps the other 22. link.tss = bad_data while any are missing'], ['yes', 'oxy_pri_storage → value null, level unknown. link.level = warning'], ['yes', 'rule "data": one caution, "TSS DATA: 1 FIELD MISSING"'], ['no', '—'], ['no', '—'], ['no', 'state arrives as normal'], ['no', 'O2 PRI shows "--" with a ring and NO DATA. Link row in warning']],
+    payload: '{"primary_battery_level":86.0, "oxy_sec_storage":88.0, …}\n   ← no "oxy_pri_storage" key',
+    alerts: () => MSG.missing.f(baseState()).alerts, st: () => MSG.missing.f(baseState()), tone: false,
+    test: 'Caught by a new backend test (decision A) and by tss:smoke exiting 1. Without the check, M1 shows NO DATA while the link says OK.' },
+  renamed: { name: 'Renamed field', what: 'NASA renames oxy_pri_storage to primary_oxygen. The old name is missing and an unknown name appears.',
+    layers: [['no', 'sends "primary_oxygen"'], ['yes', 'old name missing → bad_data as above. The unknown key "primary_oxygen" is logged once as unexpected and dropped'], ['yes', 'oxy_pri_storage unknown'], ['yes', 'one caution names the missing field'], ['no', '—'], ['no', '—'], ['no', '—'], ['no', 'same as missing: "--", NO DATA, link warning']],
+    payload: '{"primary_oxygen":92.0, …}   ← new name, not in our list',
+    alerts: () => MSG.missing.f(baseState()).alerts, st: () => MSG.missing.f(baseState()), tone: false,
+    test: 'Fix in one place: tss/mapping.py translates "primary_oxygen" to our name "oxy_pri_storage". Nothing after tss/ changes. Add a new recording as a fixture.' },
+  stale: { name: 'Stale link', what: 'The TSS stops answering (Wi-Fi drop). Nothing valid arrives for 2.5 s.',
+    layers: [['yes', 'silent'], ['yes', 'link.tss = unreachable after 2.5 s (LINK_SILENT_AFTER_S)'], ['yes', 'every suit value stale at once (keeps the number), link.level = warning'], ['yes', 'exactly one alert ("link"). Suit alerts removed, counters reset: no alerts from old data'], ['no', 'keeps sending State every second'], ['no', '—'], ['no', 'still live: the backend is fine'], ['no', 'banner: TSS LINK LOST. Values in the stale look (square, STALE)']],
+    payload: '(nothing for 2.5 s)',
+    alerts: () => MSG.link.f(baseState()).alerts, st: () => MSG.link.f(baseState()), tone: true,
+    test: 'Acceptance 4: exactly one link alert, every suit value stale, no suit alerts. When the link returns, suit alerts need 2 fresh samples and come back unacknowledged.' },
+  dead: { name: 'Backend dead', what: 'The backend process dies. Only the client can notice.',
+    layers: [['no', '—'], ['no', '—'], ['no', '—'], ['no', '—'], ['yes', 'gone'], ['no', '—'], ['yes', 'socket closes or 3 s of silence → conn = offline, reconnect with backoff'], ['yes', 'link.vm maps offline to the warning look (the one client-made look). Banner keeps the last alerts in the stale look']],
+    payload: 'WebSocket close (1006)',
+    alerts: () => [{ ...FAN }], stale: true, st: () => { const st = stateWith(x => x); st.link = { tss: 'ok', level: 'warning', mode: 'sim' }; st._offline = true; return st; }, tone: false,
+    test: 'M1 acceptance 13 still holds. New for M2: commands pressed while offline are dropped (no queue). The next State after reconnect shows the truth.' },
+  bad: { name: 'Bad command', what: 'A client sends malformed JSON, or a command with a wrong shape.',
+    layers: [['no', '—'], ['no', '—'], ['no', '—'], ['no', 'nothing changes'], ['no', 'passes the text on'], ['yes', 'Command.model_validate_json fails → logged with the reason, dropped. The socket stays open'], ['no', '—'], ['no', 'nothing changes on screen']],
+    payload: '{"type":"command","name":"ack_alert","args":{"id":42,"extra":true}}\n   ← id must be a string; extra fields are forbidden',
+    alerts: () => [{ ...FAN }], st: () => MSG.warning.f(baseState()), tone: false,
+    test: 'A backend test sends malformed and wrong-shape commands and checks that the state is unchanged and the socket is still open.' },
+  unknown: { name: 'Unknown command', what: 'A command the contract does not know, or an ack for an alert that already cleared.',
+    layers: [['no', '—'], ['no', '—'], ['no', '—'], ['no', 'ack for an id that is not active: ignored, logged'], ['no', 'passes it on'], ['yes', 'name not in the Command model → logged and dropped'], ['no', '—'], ['no', 'nothing changes']],
+    payload: '{"type":"command","name":"self_destruct","args":{}}\n{"type":"command","name":"ack_alert","args":{"id":"fan"}}   ← fan cleared 2 s ago',
+    alerts: () => [], st: () => baseState(), tone: false,
+    test: 'Decision B: an ack for an id that is no longer active does nothing, so a late press cannot acknowledge something else.' },
+  foreign: { name: 'Foreign origin', what: 'Another web page open on the laptop tries to connect to ws://localhost:8000/ws and send commands.',
+    layers: [['no', '—'], ['no', '—'], ['no', '—'], ['no', 'never reached'], ['yes', 'Origin "https://example.com" is not allowed → socket refused before accept (403). Logged'], ['no', 'never reached'], ['no', '—'], ['no', 'nothing changes']],
+    payload: 'GET /ws  Upgrade: websocket\nOrigin: https://example.com',
+    alerts: () => [{ ...FAN }], st: () => MSG.warning.f(baseState()), tone: false,
+    test: 'A backend test opens /ws with a foreign Origin and expects refusal, with an allowed Origin and expects a state, and with no Origin (a script) and expects a state.' },
+};
+let flK = 'missing';
+const flBtns = $('#flBtns');
+for (const k in FAILS) { const b = h('button', {}, FAILS[k].name); b.dataset.k = k; b.addEventListener('click', () => { flK = k; flRender(); }); flBtns.appendChild(b); }
+function flRender() {
+  const F = FAILS[flK];
+  flBtns.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === flK));
+  $('#flTitle').textContent = F.name; $('#flWhat').textContent = F.what;
+  $('#flLayers').innerHTML = `<tr><th>Layer</th><th>Notices?</th><th>What it does</th></tr>` + F.layers.map(([y, d], i) => `<tr><td>${LAYERS_F[i]}</td><td class="${y}">${y === 'yes' ? 'yes' : 'no'}</td><td>${esc(d)}</td></tr>`).join('');
+  $('#flTest').textContent = F.test;
+  $('#flBanner').innerHTML = bannerHtml(F.alerts(), { stale: !!F.stale });
+  const st = F.st();
+  $('#flLine').innerHTML = st._offline ? `<span>O2 PRI <b style="color:${P2.stale}">92% STALE</b></span><span>LINK <b style="color:${P2.warning}">OFFLINE</b></span>` : hudLine(st);
+  $('#flTone').classList.toggle('on', F.tone);
+  $('#flPayload').textContent = F.payload;
+  store.set('m2x.fail', flK);
+}
+flK = FAILS[store.get('m2x.fail', 'missing')] ? store.get('m2x.fail', 'missing') : 'missing';
+flRender();
+
+/* ---------- 7. QUIZ ---------- */
+const LAYERS = ['tss/mapping.py', 'sim/dynamics.py', 'core/alerts.py', 'core/commands.py', 'core/store.py + levels.py', 'app.py', 'data/alerts.json', 'contract.py', 'net/link.ts', 'hud/*.vm.ts', 'input/intents.ts', 'theme.ts', 'scene/'];
+const Q1 = [
+  ['Notice that oxy_pri_storage stopped arriving', 0, 'Only tss/ knows TSS names. It compares the keys with the expected list.'],
+  ['Decide that 21500 rpm is a warning', 4, 'Levels are unchanged from M1: core/levels.py with ranges.json.'],
+  ['Wait for a second bad sample before raising an alert', 2, 'The AlertBook owns the 2 in / 3 out memory.'],
+  ['Hold the text "DCU FAN to SEC, return to lander"', 6, 'Action text is data, so it can change without code.'],
+  ['Refuse a socket opened by another web page', 5, 'app.py checks Origin before it accepts the socket.'],
+  ['Reject {"name": "self_destruct"}', 3, 'core/commands validates every command against the Command model.'],
+  ['Put unacknowledged alerts above acknowledged ones', 2, 'The backend sorts. The view model takes the first 3 as sent.'],
+  ['Turn KeyA into ack_alert', 10, 'One binding table per device. Components never listen to keys.'],
+  ['Hold "warning = this colour + triangle + WARNING"', 11, 'The theme holds every look. View models only pick which one.'],
+  ['Show at most 3 rows and "+2 more"', 9, 'A display decision, made in banner.vm.ts and unit tested.'],
+  ['Make the primary fan wind down while the fan fault is on', 1, 'Our fake copies NASA\'s intended fault rules.'],
+  ['Define that an alert has id, severity, title, action, since, acked', 7, 'The single source of truth. TypeScript types are generated from it.'],
+  ['Send a command while the socket is open, drop it while offline', 8, 'The client socket owns sending.'],
+];
+const q1 = $('#q1');
+Q1.forEach(([q], i) => {
+  const row = h('div', { class: 'qrow' });
+  row.innerHTML = `<div>${esc(q)}</div><select id="q1s${i}" aria-label="Layer for: ${esc(q)}"><option value="">choose…</option>${LAYERS.map((l, j) => `<option value="${j}">${esc(l)}</option>`).join('')}</select><span id="q1m${i}" aria-live="polite"></span><div class="qexp" id="q1e${i}" hidden></div>`;
+  q1.appendChild(row);
+});
+$('#q1Check').addEventListener('click', () => {
+  let score = 0;
+  Q1.forEach(([, ans, why], i) => {
+    const v = $('#q1s' + i).value, ok = v !== '' && +v === ans; if (ok) score++;
+    $('#q1m' + i).innerHTML = v === '' ? '' : ok ? '<span class="ok verdict">✓</span>' : '<span class="bad verdict">✗</span>';
+    const e = $('#q1e' + i); e.hidden = v === ''; e.innerHTML = ok ? esc(why) : `It lives in <b>${esc(LAYERS[ans])}</b>. ${esc(why)}`;
+  });
+  $('#q1Score').textContent = `${score} / ${Q1.length}`;
+});
+const FILES = ['data/alerts.json', 'data/ranges.json', 'core/alerts.py', 'core/commands.py', 'contract.py', 'client/src/contract.gen.ts', 'tss/mapping.py', 'sim/fake_tss.py', 'data/recordings/ (new recording)', 'app.py', 'hud/banner.vm.ts', 'scene/AlertBanner.tsx', 'theme.ts', 'input/intents.ts', 'net/link.ts', 'backend/tests (a test)'];
+const Q2 = [
+  ['coolant', 'Add an alert: coolant below 80% → "Return to lander".', ['data/alerts.json', 'backend/tests (a test)'], 'Only the rule and a test. The level already comes from ranges.json, the contract carries any alert, and the banner draws any alert. If you ticked contract.py or a view model, the design is leaking.'],
+  ['intent', 'Add the intent next_step on key N and controller B (it arrives in M3).', ['input/intents.ts', 'contract.py', 'client/src/contract.gen.ts', 'core/commands.py', 'backend/tests (a test)'], 'A row in each binding table, a new name in the Command model (then npm run contract regenerates the TypeScript, never by hand), and a handler in core/commands. net/link.ts and the components do not change.'],
+  ['rename', 'NASA renames oxy_pri_storage to primary_oxygen.', ['tss/mapping.py', 'sim/fake_tss.py', 'data/recordings/ (new recording)', 'backend/tests (a test)'], 'Only the adapter (one translation), the fake that imitates NASA, and a recording. "Our name" stays oxy_pri_storage, so ranges.json, alerts.json, the contract and the client stay the same.'],
+];
+let q2k = 'coolant';
+const q2Scen = $('#q2Scen'), q2 = $('#q2');
+Q2.forEach(([k, label]) => { const b = h('button', {}, label.split(':')[0].replace(/\.$/, '')); b.dataset.k = k; b.addEventListener('click', () => { q2k = k; q2Render(); }); q2Scen.appendChild(b); });
+function q2Render() {
+  const Q = Q2.find(x => x[0] === q2k);
+  q2Scen.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === q2k));
+  $('#q2Q').innerHTML = `<b>${esc(Q[1])}</b> Tick every file that has to change.`;
+  q2.innerHTML = ''; FILES.forEach((f, i) => q2.appendChild(h('label', {}, `<input type="checkbox" id="q2c${i}"> ${esc(f)}`)));
+  $('#q2Score').textContent = ''; $('#q2Exp').hidden = true;
+}
+$('#q2Check').addEventListener('click', () => {
+  const Q = Q2.find(x => x[0] === q2k); let wrong = 0;
+  FILES.forEach((f, i) => { const c = $('#q2c' + i), should = Q[2].includes(f), ok = c.checked === should; if (!ok) wrong++; c.parentElement.classList.toggle('right', ok && c.checked); c.parentElement.classList.toggle('wrong', !ok); });
+  $('#q2Score').textContent = wrong ? `${wrong} wrong (red)` : 'All correct'; $('#q2Exp').textContent = Q[3]; $('#q2Exp').hidden = false;
+});
+q2Render();
+const Q3 = [
+  ['The fan fails and the wearer acknowledges the warning. Then the oxygen pressure warning arrives. What is on the top row, does the tone play, and what does ack_alert do now?', 'The oxygen warning is on top: unacknowledged comes before acknowledged, and the fan warning sinks to the second row, still listed. The tone plays, because a warning id appeared that was not in the previous state. The next ack_alert sends id "oxygen", so the oxygen warning is acknowledged, never the fan warning again. Try it in the Alert simulator, part 2.'],
+  ['The link drops for 4 s during a fan warning, then comes back with the fan still failed. What does the banner show during the drop and after it, and is the fan alert still acknowledged?', 'During the drop there is exactly one alert, the link warning. Suit alerts are removed, because old data must not raise or hold alarms, and every value is stale. When the link returns, the fan rule needs 2 fresh samples (about 2.4–5 s) and raises the alert again, unacknowledged, with a tone. That is a choice: re-acknowledging after an outage is safer than trusting what was true before it.'],
+  ['You want a new alert: coolant below 80% → "Return to lander". Which files change, and which must not?', 'Only data/alerts.json (a rule with the value coolant_storage, its title and its action) and a test line. The level already exists in ranges.json. Not touched: contract.py (alerts are a generic list), every view model and component (the banner draws any alert), theme.ts and tss/.'],
+  ['The backend process dies. Where is "this is serious" decided, now that severity comes from the backend?', 'Only in the client, because there is no backend to ask. The socket closes or 3 s pass in silence, net/link.ts sets conn to offline, and link.vm.ts maps that one client-only fact to the warning look. The banner keeps the last alerts but draws them in the stale look. That is the single place where the client chooses a look without the backend, and it is about the client\'s own connection, not the mission.'],
+  ['NASA renames oxy_pri_storage to primary_oxygen. Walk through what each layer notices under decision A option 2, and which file you change to fix it.', 'mapping.py notices the expected name is missing and puts it in missing. source.py sets link.tss to bad_data. The store marks that value unknown. The AlertBook raises a "TSS DATA: 1 field missing" caution. The HUD shows the other 21 values and the link in warning. tss:smoke exits 1. Fix: one line in mapping.py translating primary_oxygen to our name oxy_pri_storage, plus a new recording. See the Failure simulator.'],
+];
+const q3 = $('#q3'), saved = store.get('m2x.answers', {});
+Q3.forEach(([q, a], i) => {
+  const d = h('div', { class: 'pq' });
+  d.innerHTML = `<b>Q${i + 1}. ${esc(q)}</b><textarea id="q3t${i}" placeholder="Your answer, in your own words"></textarea><div class="controls"><button id="q3b${i}">Reveal answer</button></div><div class="ans" id="q3a${i}" hidden>${esc(a)}</div>`;
+  q3.appendChild(d);
+  const ta = d.querySelector('textarea'); ta.value = saved[i] || '';
+  ta.addEventListener('input', () => { saved[i] = ta.value; store.set('m2x.answers', saved); });
+  d.querySelector('button').addEventListener('click', e => { const el = $('#q3a' + i); el.hidden = !el.hidden; e.target.textContent = el.hidden ? 'Reveal answer' : 'Hide answer'; });
+});
+
+show();
+})();
+</script>
