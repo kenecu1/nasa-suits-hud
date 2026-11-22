@@ -4,7 +4,7 @@
 
 **Goal:** the HUD is readable and comfortable in a dim room, real walking moves the astronaut on the map, and a first-person video of a walked mission is recorded.
 
-**Builder:** Opus 5.5 with the user in the headset. **Fable:** only if position mapping cannot be made to work after one session.
+**Builder:** Opus 5.5 with the user in the headset. **Deep review:** only if position mapping cannot be made to work after one session; then stop and ask the user before starting one.
 
 **Read first:** `docs/walkthroughs/M9.md`; `docs/plan/headset-risks.md` rows 9–14.
 

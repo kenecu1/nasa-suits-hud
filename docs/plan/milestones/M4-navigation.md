@@ -2,7 +2,7 @@
 
 **Goal:** a 2D map with live position, breadcrumbs, pins and points of interest; a safe route to a target and back to the lander; a cue showing which way to walk. NASA requirements 2a, 4a, 4b, 4c, 5a.
 
-**Builder:** Opus 5.5. **Fable review:** no.
+**Builder:** Opus 5.5. **Deep review:** no (helper reviews only).
 
 **Read first:** `docs/walkthroughs/M3.md`; note `tss-map-coordinates`; decision 10 in `architecture.md`.
 

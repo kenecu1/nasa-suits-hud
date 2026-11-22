@@ -2,7 +2,7 @@
 
 **Goal:** the HUD walks the astronaut through egress and ingress, checks each step from live switch states and suit values, and catches wrong switches. A scenario driver can play a whole procedure. NASA requirement 3a (egress and ingress part).
 
-**Builder:** Opus 5.5 (Sonnet subagent for the procedure data files). **Fable review:** no.
+**Builder:** Opus 5.5 (Sonnet subagent for the procedure data files). **Deep review:** no (helper reviews only).
 
 **Read first:** `docs/walkthroughs/M2.md`; mission description Appendix A (page 10) and page 5; notes `tss-driving-the-sim`, `tss-dcu-switch-meaning`.
 

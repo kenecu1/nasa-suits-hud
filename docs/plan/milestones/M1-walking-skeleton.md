@@ -2,7 +2,7 @@
 
 **Goal:** one suit value and one switch travel from the TSS to a WebGL HUD panel, on the laptop page and inside an emulated headset session, with record/replay and tests at every layer. This milestone sets the patterns the others copy, so do the patterns properly and keep the features minimal.
 
-**Builder:** Opus 5.5. **Fable review after:** yes. Stop when done and tell the user.
+**Builder:** Opus 5.5. **Deep review:** yes (see "How milestones are reviewed" in `docs/plan/README.md`). Stop when done and tell the user.
 
 **Suggested split:** session 1 does parts 1–6 (backend), session 2 does parts 7–10 (client and end-to-end). End session 1 with `npm run check:fast` green.
 

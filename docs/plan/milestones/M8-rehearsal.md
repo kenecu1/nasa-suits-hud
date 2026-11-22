@@ -2,7 +2,7 @@
 
 **Goal:** one scripted mission runs from egress to ingress with every feature working together, on the laptop page and in the emulated headset. A laptop demo video is recorded. Everything the headset milestones need that can be built without the headset is built here.
 
-**Builder:** Opus 5.5. **Fable review after:** yes, whole system, before headset time is spent.
+**Builder:** Opus 5.5. **Deep review:** yes, in the build session (see "How milestones are reviewed" in `docs/plan/README.md`), whole system, before headset time is spent.
 
 **Read first:** all walkthroughs; `docs/plan/headset-risks.md`.
 

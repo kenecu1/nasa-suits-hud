@@ -4,7 +4,7 @@
 
 **Goal:** the HUD runs on the real headset in passthrough: it loads, enters AR, stays connected, takes input, hears and speaks. Every unknown in `docs/plan/headset-risks.md` rows 1–8 gets an answer.
 
-**Builder:** Opus 5.5, in a session with the user wearing or holding the headset. **Fable review:** no.
+**Builder:** Opus 5.5, in a session with the user wearing or holding the headset. **Deep review:** no (helper reviews only).
 
 **Read first:** `docs/plan/headset-risks.md`; notes starting with `quest-`.
 

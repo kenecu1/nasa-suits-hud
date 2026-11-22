@@ -2,7 +2,7 @@
 
 **Goal:** the astronaut holds a button, asks a question or gives a command in plain language, and gets a short spoken answer that is grounded in live data. NASA requirement 3b and the hallucination guardrail.
 
-**Builder:** Opus 5.5. Load the `claude-api` skill before writing any Claude API code. **Fable review after:** yes, of the guardrails and the evaluation.
+**Builder:** Opus 5.5. Load the `claude-api` skill before writing any Claude API code. **Deep review:** yes, in the build session (see "How milestones are reviewed" in `docs/plan/README.md`), of the guardrails and the evaluation.
 
 **Read first:** `docs/walkthroughs/M2.md`; decision 8 in `architecture.md`; note `quest-speech-runs-on-laptop`.
 

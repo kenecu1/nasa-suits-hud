@@ -68,7 +68,7 @@ Backend modes, set with `SUITS_MODE`: `sim` (default, built-in fake TSS), `repla
 3. `docs/walkthroughs/M<n>.md` exists: one page with what was built, how data flows through it (including a Mermaid sequence diagram of one event, with the files it passes through), anything that differs from `docs/briefs/M<n>.md` and why, three things to try, and three questions Kenny and Vlad should be able to answer.
 4. New lessons are in `docs/notes/` (one per file, summary on line one, index updated). Wrong notes are fixed.
 5. The status table in `docs/plan/README.md` is updated.
-6. If the milestone file asks for a Fable review, stop and tell the user. Do not start the next milestone.
+6. The review gate in `docs/plan/README.md` ("How milestones are reviewed") has run in this session, and its findings are fixed or listed in the walkthrough. Then stop and tell the user. Do not start the next milestone.
 
 ## Git
 

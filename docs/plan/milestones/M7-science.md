@@ -2,7 +2,7 @@
 
 **Goal:** at each point of interest the HUD shows the right task checklist, live data from the science devices, and logs samples on the map. NASA requirement 3a (station procedures), the spectrometer display, and "payload data at any time".
 
-**Builder:** Sonnet 5.5. This milestone copies patterns from M2–M4; if something needs a new pattern, stop and ask. **Fable review:** no.
+**Builder:** Sonnet 5.5. This milestone copies patterns from M2–M4; if something needs a new pattern, stop and ask. **Deep review:** no (helper reviews only).
 
 **Read first:** `docs/walkthroughs/M3.md` and `M4.md`; mission description page 6; notes `tss-readme-payload-sizes-wrong`, `tss-suit-telemetry-is-legacy-only`.
 

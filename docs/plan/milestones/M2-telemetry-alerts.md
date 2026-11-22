@@ -2,7 +2,7 @@
 
 **Goal:** the HUD shows all suit data and raises clear, prioritised alerts with a recommended action, in a visual style built for a dim room. NASA requirements 1a, 6a, 6b.
 
-**Builder:** Opus 5.5 (use a Sonnet subagent to wire the 22 fields and write table tests). **Fable review:** no.
+**Builder:** Opus 5.5 (use a Sonnet subagent to wire the 22 fields and write table tests). **Deep review:** no (helper reviews only).
 
 **Read first:** `docs/walkthroughs/M1.md`; `docs/archive/hud-layout.md`; "HUD layout rules" in `architecture.md`.
 

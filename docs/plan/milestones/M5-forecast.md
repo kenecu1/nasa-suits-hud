@@ -2,7 +2,7 @@
 
 **Goal:** the HUD shows how long each consumable will last, how far the astronaut can still go, and tells them when to turn back. The forecast is a trained model with an honest evaluation against a simple baseline. NASA requirement 4d.
 
-**Builder:** Opus 5.5. **Fable review after:** yes, of the evaluation method (data splits, leakage, whether the claims in the report follow from the numbers).
+**Builder:** Opus 5.5. **Deep review:** yes, in the build session (see "How milestones are reviewed" in `docs/plan/README.md`), of the evaluation method (data splits, leakage, whether the claims in the report follow from the numbers).
 
 **Read first:** `docs/walkthroughs/M2.md`; the TSS simulation code in `vendor/TSS2027/src/` (`lib/simulation/` and the telemetry update functions in `data.c`) — read it in a Sonnet subagent and keep a summary.
 
