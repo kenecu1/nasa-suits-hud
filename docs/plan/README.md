@@ -23,7 +23,7 @@ Build in this order. After M2 there are two tracks that can run in parallel sess
 | # | Milestone | Needs | Builder | Deep review | Status |
 |---|---|---|---|---|---|
 | M1 | [Walking skeleton](milestones/M1-walking-skeleton.md): TSS → HUD panel on laptop and emulated headset | — | Opus 5.5 | **Yes, after** | **done** (2026-11-22): all acceptance items pass, helper reviews and deep review done, debriefed. Waiting for Vlad to push and accept. See [walkthrough](../walkthroughs/M1.md) |
-| M2 | [Telemetry, caution and warning, low-light design](milestones/M2-telemetry-alerts.md) | M1 | Opus 5.5 | no | **in progress**: session 1 (backend, contract, data; acceptance 1–5) done 2026-11-24, `check:fast` green. Session 2 (client, end to end) next. See [walkthrough](../walkthroughs/M2.md) |
+| M2 | [Telemetry, caution and warning, low-light design](milestones/M2-telemetry-alerts.md) | M1 | Opus 5.5 | no | **done** (2026-11-24): session 1 (backend, contract, data; acceptance 1–5) and session 2 (client, end to end; acceptance 6–12) built, `npm run check` green, session-2 helper reviews done. Waiting for Kenny and Vlad to accept and push. See [walkthrough](../walkthroughs/M2.md) |
 | M3 | [Procedures: egress and ingress](milestones/M3-procedures.md) (track A) | M2 | Opus 5.5 | no | not started |
 | M4 | [Navigation](milestones/M4-navigation.md) (track A) | M3 | Opus 5.5 | no | not started |
 | M5 | [Forecast and predicted range](milestones/M5-forecast.md) (track B) | M2 | Opus 5.5 | **Yes, evaluation method** | not started |
