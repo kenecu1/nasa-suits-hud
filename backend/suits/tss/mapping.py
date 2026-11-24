@@ -64,16 +64,62 @@ def uia_positions(flags: UiaFlags) -> UiaPositions:
     )
 
 
+# Our telemetry names: every value core uses (data/ranges.json lists the same names; a test
+# checks they agree). Today they equal the TSS's names. If NASA renames a field, add it to
+# RENAMED and nothing after suits/tss changes (decision A in docs/briefs/M2.md).
+EXPECTED_TELEMETRY: tuple[str, ...] = (
+    "primary_battery_level",
+    "secondary_battery_level",
+    "oxy_pri_storage",
+    "oxy_sec_storage",
+    "oxy_pri_pressure",
+    "oxy_sec_pressure",
+    "suit_pressure_oxy",
+    "suit_pressure_co2",
+    "suit_pressure_other",
+    "suit_pressure_total",
+    "helmet_pressure_co2",
+    "fan_pri_rpm",
+    "fan_sec_rpm",
+    "scrubber_a_co2_storage",
+    "scrubber_b_co2_storage",
+    "temperature",
+    "coolant_storage",
+    "coolant_gas_pressure",
+    "coolant_liquid_pressure",
+    "heart_rate",
+    "oxy_consumption",
+    "co2_production",
+    "eva_elapsed_time",
+)
+
+# TSS name -> our name, for fields NASA has renamed. Empty while the names agree.
+RENAMED: dict[str, str] = {}
+
+
 def telemetry_values(section: dict[str, Any]) -> dict[str, float | None]:
-    """Legacy GET 1. Every key is kept under the TSS's name; a non-number becomes None."""
+    """Legacy GET 1. Keys are our names (RENAMED applied); a non-number becomes None.
+
+    Names we do not expect are kept too (they are harmless and show in tss:smoke). Expected
+    names that are absent are not invented here: ``missing_telemetry`` reports them.
+    """
     if not section:
         raise BadField("telemetry section is empty")
     values: dict[str, float | None] = {}
-    for name, raw in section.items():
-        values[name] = _finite(raw)
+    for tss_name, raw in section.items():
+        values[RENAMED.get(tss_name, tss_name)] = _finite(raw)
     if all(v is None for v in values.values()):
         raise BadField("telemetry has no value that is a finite number")
     return values
+
+
+def missing_telemetry(values: dict[str, float | None]) -> tuple[str, ...]:
+    """Expected names absent from a mapped telemetry section, in EXPECTED_TELEMETRY order.
+
+    A name that is present with a value that is not a number is not missing: it arrived, and
+    core shows it as unknown.
+    """
+    return tuple(name for name in EXPECTED_TELEMETRY if name not in values)
 
 
 def _finite(raw: Any) -> float | None:

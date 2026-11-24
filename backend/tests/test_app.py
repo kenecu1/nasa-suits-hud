@@ -222,9 +222,10 @@ def test_health_is_degraded_before_the_first_state():
     from suits.tss.source import TssSource
 
     source = TssSource()
+    store = Store(Mode.SIM)
     app = create_app(Settings(mode=Mode.SIM))
-    app.state.runtime = Runtime(Settings(mode=Mode.SIM), source,
-                                Publisher(source.snapshot, Store(Mode.SIM)))
+    app.state.runtime = Runtime(Settings(mode=Mode.SIM), source, store,
+                                Publisher(source.snapshot, store))
     route = next(r for r in app.routes if getattr(r, "path", "") == "/health")
 
     body = asyncio.run(route.endpoint())

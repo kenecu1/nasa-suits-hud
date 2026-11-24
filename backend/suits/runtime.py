@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 class Runtime:
     settings: Settings
     source: TssSource
+    store: Store
     publisher: Publisher
     fake_tss: FakeTss | None = None  # sim mode only: tests change its values
     client: TssClient | None = None
@@ -73,9 +74,10 @@ async def start_runtime(settings: Settings) -> Runtime:
         replayer = Replayer(settings.recording, settings.replay_speed)
     # in replay, time is the recording's, so the link goes stale when the recording ends
     source = TssSource(clock=replayer.clock, wall=replayer.clock) if replayer else TssSource()
-    publisher = Publisher(source.snapshot, Store(settings.mode))
+    store = Store(settings.mode)
+    publisher = Publisher(source.snapshot, store)
     source.on_change = publisher.notify_change
-    runtime = Runtime(settings, source, publisher, replayer=replayer)
+    runtime = Runtime(settings, source, store, publisher, replayer=replayer)
     try:
         await _start(runtime, settings)
     except BaseException:

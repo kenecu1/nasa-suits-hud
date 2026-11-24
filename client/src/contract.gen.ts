@@ -2,6 +2,14 @@
 // Contract v2: State is sent backend -> client as JSON text on /ws.
 
 /**
+ * Alert severity. Warning ranks above caution.
+ *
+ * This interface was referenced by `SuitsContract`'s JSON-Schema
+ * via the `definition` "Severity".
+ */
+export type Severity = "warning" | "caution";
+export type Level = "nominal" | "caution" | "warning" | "unknown" | "stale";
+/**
  * This interface was referenced by `SuitsContract`'s JSON-Schema
  * via the `definition` "Mode".
  */
@@ -20,13 +28,28 @@ export type LinkStatus = "unassigned" | "bad_data" | "unreachable" | "stale" | "
  * This interface was referenced by `SuitsContract`'s JSON-Schema
  * via the `definition` "Level".
  */
-export type Level = "nominal" | "caution" | "warning" | "unknown" | "stale";
+export type Level1 = "nominal" | "caution" | "warning" | "unknown" | "stale";
 
 /**
  * Contract v2. Generated from backend/suits/contract.py.
  */
 export interface SuitsContract {
+  Command: Command;
   State: State;
+}
+/**
+ * A user action. Parsed and carried out by core/commands.py; an invalid one is dropped.
+ *
+ * This interface was referenced by `SuitsContract`'s JSON-Schema
+ * via the `definition` "Command".
+ */
+export interface Command {
+  args: CommandArgs;
+  name: "ack_alert" | "toggle_details";
+  type: "command";
+}
+export interface CommandArgs {
+  id: string | null;
 }
 /**
  * Full state, sent once a second and soon after anything changes.
@@ -35,6 +58,7 @@ export interface SuitsContract {
  * via the `definition` "State".
  */
 export interface State {
+  alerts: Alert[];
   dcu: DcuPositions | null;
   eva: Eva;
   link: Link;
@@ -42,8 +66,23 @@ export interface State {
   suit: Suit;
   t: number;
   type: "state";
+  ui: Ui;
   uia: UiaPositions | null;
   v: 2;
+}
+/**
+ * One problem, with what to do about it. Built by core/alerts.py from data/alerts.json.
+ *
+ * This interface was referenced by `SuitsContract`'s JSON-Schema
+ * via the `definition` "Alert".
+ */
+export interface Alert {
+  acked: boolean;
+  action: string;
+  id: string;
+  severity: Severity;
+  since: number;
+  title: string;
 }
 /**
  * This interface was referenced by `SuitsContract`'s JSON-Schema
@@ -72,6 +111,7 @@ export interface Eva {
  */
 export interface Link {
   age_s: number | null;
+  level: Level;
   mode: Mode;
   tss: LinkStatus;
 }
@@ -102,9 +142,15 @@ export interface SuitFaults {
  * via the `definition` "SuitValue".
  */
 export interface SuitValue {
-  level: Level;
+  level: Level1;
   unit: string;
   value: number | null;
+}
+/**
+ * Shared view state that commands change (every user action is a command).
+ */
+export interface Ui {
+  details_open: boolean;
 }
 /**
  * This interface was referenced by `SuitsContract`'s JSON-Schema
@@ -117,4 +163,20 @@ export interface UiaPositions {
   o2_vent: "OPEN" | "CLOSED";
   water_supply: "OPEN" | "CLOSED";
   water_waste: "OPEN" | "CLOSED";
+}
+/**
+ * This interface was referenced by `SuitsContract`'s JSON-Schema
+ * via the `definition` "CommandArgs".
+ */
+export interface CommandArgs1 {
+  id: string | null;
+}
+/**
+ * Shared view state that commands change (every user action is a command).
+ *
+ * This interface was referenced by `SuitsContract`'s JSON-Schema
+ * via the `definition` "Ui".
+ */
+export interface Ui1 {
+  details_open: boolean;
 }

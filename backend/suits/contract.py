@@ -1,6 +1,6 @@
 """Message shapes: the single source of truth.
 
-``State`` (and later ``Command``) cross the wire; their TypeScript types are generated into
+``State`` and ``Command`` cross the wire; their TypeScript types are generated into
 client/src/contract.gen.ts by ``npm run contract``. ``TssSnapshot`` is internal to the backend:
 it is what the TSS adapter hands to core, so nothing outside ``suits/tss`` sees TSS packets.
 
@@ -42,7 +42,7 @@ class LinkStatus(StrEnum):
     """
 
     UNASSIGNED = "unassigned"  # the TSS answered Ack 1: assign our IP to a team in its web UI
-    BAD_DATA = "bad_data"  # the newest datagram on some path could not be decoded
+    BAD_DATA = "bad_data"  # a datagram could not be decoded, or telemetry lacks expected names
     UNREACHABLE = "unreachable"  # nothing valid from any path for LINK_SILENT_AFTER_S
     STALE = "stale"  # the link works but some section is older than its STALE_AFTER_S
     OK = "ok"
@@ -54,6 +54,13 @@ class Level(StrEnum):
     WARNING = "warning"
     UNKNOWN = "unknown"  # no value, or not a number
     STALE = "stale"  # last value is older than STALE_AFTER_S["telemetry"]
+
+
+class Severity(StrEnum):
+    """Alert severity. Warning ranks above caution."""
+
+    WARNING = "warning"
+    CAUTION = "caution"
 
 
 class Mode(StrEnum):
@@ -114,11 +121,17 @@ class TssSnapshot(_Model):
 
     Sections hold the last value received, however old; None means never received.
     ``ages`` says how old each one is. Core decides what is stale (``STALE_AFTER_S``).
+    ``arrivals`` counts how many times each section has arrived, so core can tell a new
+    sample from the same one seen twice (decision C in docs/briefs/M2.md).
     """
 
     t: float  # wall-clock time the snapshot was taken (recording time in replay)
     link: LinkStatus
     ages: dict[Section, float]  # seconds since each section last arrived; absent = never
+    arrivals: dict[Section, int] = {}  # times each section arrived; absent = never
+    # Expected telemetry names (our names, see suits/tss/mapping.py) absent from the newest
+    # telemetry section, sorted. Empty when telemetry has never arrived (decision A).
+    missing: tuple[str, ...] = ()
     telemetry: dict[str, float | None]  # TSS names; None = present but not a finite number
     elapsed_s: float | None = None  # EVA elapsed time from telemetry, so core needs no TSS name
     started: bool | None
@@ -140,6 +153,9 @@ class Link(_Model):
     tss: LinkStatus
     age_s: float | None
     mode: Mode
+    # How serious the link status is, decided by core/store.py: ok -> nominal, stale -> stale,
+    # unreachable, unassigned and bad_data -> warning. The client draws it; it does not decide.
+    level: Level = Level.NOMINAL
 
 
 class Eva(_Model):
@@ -167,6 +183,23 @@ class Suit(_Model):
     faults: SuitFaults | None  # None = unknown or stale
 
 
+class Alert(_Model):
+    """One problem, with what to do about it. Built by core/alerts.py from data/alerts.json."""
+
+    id: str  # stable while the problem lasts: "fan", "link", "value.<name>"...
+    severity: Severity
+    title: str  # short, e.g. "FAN PRI 21500 rpm"
+    action: str  # NASA's recommended action, e.g. "DCU FAN to SEC, return to lander"
+    since: float  # State.t when the alert was raised
+    acked: bool  # the wearer has seen it; it stays listed until the problem clears
+
+
+class Ui(_Model):
+    """Shared view state that commands change (every user action is a command)."""
+
+    details_open: bool = False
+
+
 class State(_Model):
     """Full state, sent once a second and soon after anything changes."""
 
@@ -179,9 +212,38 @@ class State(_Model):
     suit: Suit
     dcu: DcuPositions | None  # None = unknown or stale
     uia: UiaPositions | None
+    # Sorted by the backend: unacknowledged first, then warning before caution, then newest
+    # first. The client draws them in this order; ack_alert acts on the first one.
+    alerts: tuple[Alert, ...] = ()
+    ui: Ui = Ui()
 
 
-WIRE_MODELS: tuple[type[BaseModel], ...] = (State,)
+# ---- wire: client -> backend ----
+
+CommandName = Literal["ack_alert", "toggle_details"]
+
+
+class CommandArgs(_Model):
+    # ack_alert: the id of the alert the client showed on top (decision B in docs/briefs/M2.md).
+    # None: acknowledge whatever is on top now (voice, M6).
+    id: str | None = None
+
+
+class Command(_Model):
+    """A user action. Parsed and carried out by core/commands.py; an invalid one is dropped."""
+
+    type: Literal["command"] = "command"
+    name: CommandName
+    args: CommandArgs = CommandArgs()
+
+    @model_validator(mode="after")
+    def _args_fit_name(self) -> Command:
+        if self.name != "ack_alert" and self.args.id is not None:
+            raise ValueError(f"{self.name} takes no id")
+        return self
+
+
+WIRE_MODELS: tuple[type[BaseModel], ...] = (State, Command)
 
 
 def json_schema() -> dict:

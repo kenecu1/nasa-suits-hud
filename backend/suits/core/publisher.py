@@ -101,7 +101,9 @@ class Publisher:
             return None
 
     def _publish(self, force: bool) -> State | None:
-        state = self._store.preview(self._snapshot())
+        snapshot = self._snapshot()
+        self._store.observe(snapshot)  # count a new telemetry arrival once, sent or not
+        state = self._store.preview(snapshot)
         key = content_key(state)
         if not force and key == self._last_key:
             return None

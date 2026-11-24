@@ -2,7 +2,9 @@
 
 Live transports (subscription.py, legacy.py) and the replayer (recorder.py) call the same
 ``feed``, so a recording tests the real decoder. ``snapshot()`` turns what has arrived into a
-``TssSnapshot``, including the one link status (decision A in docs/briefs/M1.md).
+``TssSnapshot``, including the one link status (decision A in docs/briefs/M1.md), how many
+times each section has arrived, and which expected telemetry names are missing (decision A
+in docs/briefs/M2.md: the link is ``bad_data`` while any are missing).
 
 Channels name where a datagram came from:
 * ``"sub"``: the new protocol socket (port 14141)
@@ -69,6 +71,8 @@ class TssSource:
         self._wall = wall
         self.on_change = on_change
         self._sections: dict[Section, _Received] = {}
+        self._arrivals: dict[Section, int] = {}  # every arrival counts, changed or not
+        self._missing: tuple[str, ...] = ()  # expected names absent from the newest telemetry
         self._channels: dict[str, _ChannelHealth] = {}
         # Set by Ack 1, cleared only by Ack 0: a lost Ack must not make the link flicker.
         self._unassigned = False
@@ -139,7 +143,16 @@ class TssSource:
 
     def _on_legacy(self, section: Section, body: dict[str, Any]) -> None:
         if section == "telemetry":
-            self._store(section, mapping.telemetry_values(body))
+            values = mapping.telemetry_values(body)
+            missing = mapping.missing_telemetry(values)
+            if missing != self._missing:
+                if missing:
+                    log.warning("TSS telemetry is missing expected names: %s", ", ".join(missing))
+                else:
+                    log.info("TSS telemetry has every expected name again")
+                self._missing = missing
+                self._changed()
+            self._store(section, values)
         elif section == "status":
             self._store(section, mapping.eva_started(body))
         elif section == "faults":
@@ -148,6 +161,7 @@ class TssSource:
     def _store(self, section: Section, value: Any) -> None:
         previous = self._sections.get(section)
         self._sections[section] = _Received(value, self._clock())
+        self._arrivals[section] = self._arrivals.get(section, 0) + 1
         if previous is None or previous.value != value:
             self._changed()
 
@@ -172,6 +186,8 @@ class TssSource:
             t=self._wall(),
             link=self._link(now, ages),
             ages=ages,
+            arrivals=dict(self._arrivals),
+            missing=self._missing,
             telemetry=self._value("telemetry", dict),
             elapsed_s=mapping.elapsed_seconds(self._value("telemetry", dict)),
             started=self._value("status", None),
@@ -187,7 +203,11 @@ class TssSource:
         return default_factory() if default_factory else None
 
     def _link(self, now: float, ages: dict[Section, float]) -> LinkStatus:
-        """Worst first: unassigned, bad_data, unreachable, stale, ok (decision A)."""
+        """Worst first: unassigned, bad_data, unreachable, stale, ok (decision A).
+
+        bad_data: the newest datagram on some path could not be decoded, or (after the
+        unreachable check) the current telemetry lacks expected names.
+        """
 
         def recent(at: float | None) -> bool:
             return at is not None and now - at <= LINK_SILENT_AFTER_S
@@ -199,6 +219,15 @@ class TssSource:
             return LinkStatus.BAD_DATA
         if not recent(self._last_valid_at):
             return LinkStatus.UNREACHABLE
+        # Current telemetry lacks expected names: what did arrive is used, but the link must
+        # not look healthy (decision A in docs/briefs/M2.md). A silent TSS is unreachable first.
+        telemetry_age = ages.get("telemetry")
+        if (
+            self._missing
+            and telemetry_age is not None
+            and telemetry_age <= STALE_AFTER_S["telemetry"]
+        ):
+            return LinkStatus.BAD_DATA
         if any(s not in ages or ages[s] > STALE_AFTER_S[s] for s in SECTIONS):
             return LinkStatus.STALE
         return LinkStatus.OK

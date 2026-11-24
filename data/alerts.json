@@ -1,0 +1,77 @@
+{
+  "_source": "Actions from NASA TSS2027 documents/telemetry_ranges/eva-telemetry-ranges.pdf (the notes column) and docs/plan/milestones/M2-telemetry-alerts.md. Grouping per problem: decision D in docs/briefs/M2.md.",
+  "_how_it_works": "One alert per problem. A rule's values are checked with data/ranges.json: the alert rises after 2 new telemetry samples off nominal and clears after 3 nominal ones. A rule's fault flag raises a warning at once and clears on the first all-clear. Severity is the worst of the inputs. A value with 'switch' watches only the device the DCU switch selects (by_position maps each switch position to a value). Every ranged value that no rule names gets its own alert with the generic action. Link and data alerts are not suit alerts: they show even before the EVA starts.",
+  "rules": [
+    {
+      "id": "fan",
+      "label": "FAN",
+      "action": "DCU FAN to SEC, return to lander",
+      "fault": "fan",
+      "values": [
+        {"switch": "fan", "by_position": {"PRI": "fan_pri_rpm", "SEC": "fan_sec_rpm"}, "label": "FAN {position}"},
+        {"value": "helmet_pressure_co2", "label": "HELMET CO2"}
+      ]
+    },
+    {
+      "id": "oxygen",
+      "label": "SUIT O2",
+      "action": "DCU OXY to SEC, return to lander",
+      "fault": "oxy",
+      "values": [
+        {"value": "suit_pressure_oxy", "label": "SUIT O2"}
+      ]
+    },
+    {
+      "id": "co2",
+      "label": "CO2",
+      "action": "Flip DCU CO2",
+      "fault": "scrubber",
+      "values": [
+        {"value": "suit_pressure_co2", "label": "SUIT CO2"},
+        {"switch": "co2", "by_position": {"A": "scrubber_a_co2_storage", "B": "scrubber_b_co2_storage"}, "label": "SCRUBBER {position}"}
+      ]
+    },
+    {
+      "id": "battery",
+      "label": "POWER",
+      "action": "Switch battery",
+      "fault": "power",
+      "values": [
+        {"value": "primary_battery_level", "label": "BATT PRI"},
+        {"value": "secondary_battery_level", "label": "BATT SEC"}
+      ]
+    },
+    {
+      "id": "heart_rate",
+      "label": "HEART RATE",
+      "action": "Slow down",
+      "fault": null,
+      "values": [
+        {"value": "heart_rate", "label": "HEART RATE"}
+      ]
+    },
+    {
+      "id": "temperature",
+      "label": "TEMP",
+      "action": "Slow down",
+      "fault": null,
+      "values": [
+        {"value": "temperature", "label": "TEMP"}
+      ]
+    }
+  ],
+  "generic": {
+    "action": "Check details, report to LMCC"
+  },
+  "link": {
+    "unreachable": {"severity": "warning", "title": "TSS LINK LOST", "action": "Values are old. Contact LMCC by voice"},
+    "unassigned": {"severity": "warning", "title": "TSS TEAM NOT ASSIGNED", "action": "Assign this laptop in the TSS web UI"},
+    "bad_data": {"severity": "warning", "title": "TSS BAD DATA", "action": "Values may be wrong. Report to LMCC"},
+    "stale": {"severity": "caution", "title": "SUIT DATA OLD", "action": "Values are old. Report to LMCC"}
+  },
+  "data": {
+    "severity": "caution",
+    "title": "TSS DATA: {count} {fields} MISSING",
+    "action": "Missing {names}. Report to LMCC"
+  }
+}

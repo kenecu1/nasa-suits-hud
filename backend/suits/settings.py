@@ -15,6 +15,33 @@ class SettingsError(ValueError):
     pass
 
 
+DEFAULT_CLIENT_PORT = 5173
+DEFAULT_E2E_CLIENT_PORT = 5183  # e2e/support/ports.ts
+
+
+def _port(env: Mapping[str, str], name: str, default: int) -> int:
+    raw = env.get(name, "")
+    if raw == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise SettingsError(f"{name} must be a port number, got {raw!r}") from None
+    if not 1 <= value <= 65535:
+        raise SettingsError(f"{name} must be a port number, got {raw!r}")
+    return value
+
+
+def _origins(raw: str) -> tuple[str, ...]:
+    """SUITS_ALLOWED_ORIGINS: comma-separated, e.g. "https://192.168.1.20:5173"."""
+    origins = tuple(o.strip().rstrip("/") for o in raw.split(",") if o.strip())
+    bad = [o for o in origins if not o.startswith(("http://", "https://"))]
+    if bad:
+        raise SettingsError(f"SUITS_ALLOWED_ORIGINS entries must start with http:// or https://, "
+                            f"got {', '.join(bad)}")
+    return origins
+
+
 @dataclass(frozen=True)
 class Settings:
     mode: Mode = Mode.SIM
@@ -23,6 +50,21 @@ class Settings:
     tss_host: str | None = None  # live
     tss_team: int = 0
     record: bool = False  # sim/live: save raw datagrams to data/recordings/
+    client_port: int = DEFAULT_CLIENT_PORT  # SUITS_CLIENT_PORT: the page's port
+    e2e_client_port: int = DEFAULT_E2E_CLIENT_PORT  # SUITS_E2E_CLIENT_PORT: Playwright's page
+    extra_origins: tuple[str, ...] = ()  # SUITS_ALLOWED_ORIGINS, e.g. the headset's address
+
+    def allowed_origins(self) -> frozenset[str]:
+        """Browser origins that may open /ws: the HUD's own pages (docs/briefs/M2.md, 8.5).
+
+        Browsers do not apply CORS to WebSockets, so without this any page open on the laptop
+        could connect and send commands.
+        """
+        hosts = ("localhost", "127.0.0.1", "[::1]")
+        ports = (self.client_port, self.e2e_client_port)
+        own = {f"{scheme}://{host}:{port}" for scheme in ("http", "https") for host in hosts
+               for port in ports}
+        return frozenset(own | set(self.extra_origins))
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -53,4 +95,7 @@ class Settings:
             tss_host=host,
             tss_team=team,
             record=env.get("SUITS_RECORD", "") in ("1", "true", "yes"),
+            client_port=_port(env, "SUITS_CLIENT_PORT", DEFAULT_CLIENT_PORT),
+            e2e_client_port=_port(env, "SUITS_E2E_CLIENT_PORT", DEFAULT_E2E_CLIENT_PORT),
+            extra_origins=_origins(env.get("SUITS_ALLOWED_ORIGINS", "")),
         )

@@ -1,4 +1,8 @@
-"""FastAPI app: /ws sends State, /health says how the backend is. Wiring only.
+"""FastAPI app: /ws sends State and takes commands, /health says how the backend is. Wiring only.
+
+/ws refuses a browser page from any origin but the HUD's own (Settings.allowed_origins), before
+accepting the socket. A client that sends no Origin (scripts, tests) is not a browser being
+misused and is allowed. Text frames are handed to core/commands.py; this file parses nothing.
 
 Run: uvicorn --factory suits.app:create_app  (npm run dev does this)
 """
@@ -11,6 +15,7 @@ from contextlib import asynccontextmanager
 import anyio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from suits.core import commands
 from suits.runtime import Runtime, start_runtime
 from suits.settings import Settings
 
@@ -62,10 +67,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "dead_tasks": dead,
         }
 
+    origins = cfg.allowed_origins()
+
     @app.websocket("/ws")
     async def ws(websocket: WebSocket) -> None:
+        origin = websocket.headers.get("origin")
+        if origin is not None and origin.rstrip("/") not in origins:
+            log.warning("refused a /ws connection from origin %.100r (allowed: the HUD's own "
+                        "pages; add others with SUITS_ALLOWED_ORIGINS)", origin)
+            await websocket.close(code=1008)  # before accept: the browser sees HTTP 403
+            return
         await websocket.accept()
-        publisher = runtime_of(app).publisher
+        runtime = runtime_of(app)
+        publisher = runtime.publisher
         queue = publisher.subscribe()
 
         # An anyio task group, not raw asyncio tasks: Starlette runs the socket inside anyio
@@ -83,15 +97,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             group.cancel_scope.cancel()
                             return
 
-                async def until_closed() -> None:
-                    # Reading notices a closed socket at once, not at the next send.
-                    # M1 clients send nothing; command messages arrive here from M2 on.
-                    while (await websocket.receive())["type"] != "websocket.disconnect":
-                        pass
+                async def read_commands() -> None:
+                    # Reading also notices a closed socket at once, not at the next send.
+                    while True:
+                        message = await websocket.receive()
+                        if message["type"] == "websocket.disconnect":
+                            break
+                        text = message.get("text")
+                        if text is None:
+                            log.warning("dropped a binary /ws frame (%d bytes): no binary "
+                                        "messages before M6", len(message.get("bytes") or b""))
+                            continue
+                        try:
+                            changed = commands.handle(text, runtime.store)
+                        except Exception:  # a bug in one command must not close the socket
+                            log.exception("command failed: %.200r", text)
+                            continue
+                        if changed:
+                            publisher.notify_change()
                     group.cancel_scope.cancel()
 
                 group.start_soon(send_states)
-                group.start_soon(until_closed)
+                group.start_soon(read_commands)
         finally:
             publisher.unsubscribe(queue)
 
