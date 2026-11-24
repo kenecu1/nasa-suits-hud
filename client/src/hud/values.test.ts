@@ -172,6 +172,18 @@ describe("valueText", () => {
     expect(valueText("heart_rate", 90.6, "bpm")).toBe("91 bpm");
   });
 
+  it.each<[string, number, string, string]>([
+    ["heart_rate", 49.6, "bpm", "49 bpm"], // below the minimum 50: must not read "50"
+    ["heart_rate", 160.4, "bpm", "161 bpm"], // above the maximum 160: must not read "160"
+    ["temperature", 32.04, "°C", "32.1 °C"], // above 32
+    ["temperature", 9.96, "°C", "9.9 °C"], // below 10
+    ["suit_pressure_oxy", 4.104, "psi", "4.11 psi"], // above 4.1
+    ["oxy_pri_storage", 19.99, "%", "19%"], // checked low, below 20
+    ["scrubber_a_co2_storage", 60.01, "%", "61%"], // checked high, above 60
+  ])("never shows %s %s as if it were inside its limit", (name, value, unit, text) => {
+    expect(valueText(name, value, unit)).toBe(text);
+  });
+
   it("rounds a name without a range to the nearest", () => {
     expect(valueText("brand_new_value", 1.004, "x")).toBe("1.00 x");
     expect(valueText("brand_new_value", 1.006, "x")).toBe("1.01 x");
@@ -188,9 +200,21 @@ describe("valueRow", () => {
       name: "oxy_pri_storage",
       label: "O2 PRI",
       text: "92%",
+      wordText: "",
       level: "nominal",
       ...theme.level.nominal,
     });
+  });
+
+  it.each<Level>(["caution", "warning", "unknown", "stale", "off"])("draws the word beside a %s value", (level) => {
+    const value = level === "unknown" ? makeValue(null, level, "bpm") : makeValue(70, level, "bpm");
+    const row = valueRow(withValue("heart_rate", value), "heart_rate", "live");
+    expect(row.wordText).toBe(theme.level[level].word);
+  });
+
+  it("draws no word beside a nominal value, but keeps its shape and colour", () => {
+    const row = valueRow(makeState(), "heart_rate", "live");
+    expect(row).toMatchObject({ wordText: "", shape: "circle", color: theme.level.nominal.color });
   });
 
   it.each<Level>(["nominal", "caution", "warning", "stale", "off"])("takes colour, shape and word of the level %s", (level) => {

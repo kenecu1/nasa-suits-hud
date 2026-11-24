@@ -1,6 +1,5 @@
-// One value on one line: shape, label, number and, when it is not nominal, the level's word.
-// Nominal shows no word: seven green "NOMINAL"s would be noise in a dim helmet; its circle and
-// colour still say it, and every other level adds its word.
+// One value on one line: shape, label, number and the word the view model gives (none while
+// nominal, see ValueRow.wordText).
 import { Container, Text } from "@react-three/uikit";
 import type { ReactNode } from "react";
 import type { ValueRow } from "../hud/types";
@@ -26,7 +25,7 @@ export function ValueLine({ row, valueSize = font.row, children }: {
         {row.text}
       </Text>
       <Text fontSize={font.word} fontWeight="bold" color={row.color} width={panel.wordWidth} textAlign="right">
-        {row.level === "nominal" ? "" : row.word}
+        {row.wordText}
       </Text>
     </Container>
   );

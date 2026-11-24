@@ -124,18 +124,29 @@ test("inside the session the view models match the laptop's, and the controller'
   page,
   backend,
 }, testInfo) => {
-  await backend.start({ mode: "sim", scenario: "fan_failure", speed: 10 });
+  // In the session first (the Enter AR click also lets the page play sound), then the fan fails.
   await page.goto(PAGE);
   await hudIsLive(page);
   await enterAr(page);
   await page.evaluate(() => {
     (window as unknown as EmulatorWindow).__headset.primaryInputMode = "controller";
   });
+  await backend.start({ mode: "sim", scenario: "fan_failure", speed: 10 });
 
   // Acceptance 11: the same view-model checks as on the laptop, inside the session.
   await expect.poll(async () => (await hud(page)).panels.banner.rows[0]?.id, { timeout: 20_000 }).toBe("fan");
   const { panels } = await hud(page);
-  expect(panels.banner.rows[0]).toMatchObject({ level: "warning", word: "WARNING", action: "DCU FAN to SEC, return to lander" });
+  expect(panels.banner.rows[0]).toMatchObject({
+    level: "warning",
+    word: "WARNING",
+    shape: "triangle",
+    action: "DCU FAN to SEC, return to lander",
+    acked: false,
+  });
+  expect(panels.banner.topId).toBe("fan");
+  expect(panels.vitals.rows.map((r) => r.level)).toEqual(["nominal", "nominal"]);
+  expect(panels.switches.dcu.rows.every((r) => r.current)).toBe(true);
+  expect((await hud(page)).tones, "the warning tone plays in the session").toBe(1);
   expect(panels.link).toMatchObject({ status: "ok", level: "nominal" });
   expect(panels.consumables.rows).toHaveLength(7);
   await sceneIsSteady(page);

@@ -5,9 +5,8 @@ import { useFrame, type RootState } from "@react-three/fiber";
 import { useXR } from "@react-three/xr";
 import { useRef, type RefObject } from "react";
 import { Vector3, type Camera, type Group } from "three";
-import { LAYOUT, type PanelName } from "../hud/layout";
+import { LAYOUT, localCorners, type PanelName } from "../hud/layout";
 import type { HudView } from "../testHook";
-import { theme } from "../theme";
 import { RIG_PLACED } from "./HudRig";
 import type { PanelRegistry } from "./PanelAt";
 import { headYaw } from "./rigMath";
@@ -18,21 +17,7 @@ const corner = new Vector3();
 const direction = new Vector3();
 const laptopEye: Camera[] = [];
 
-/** The four corners of a panel, in metres, relative to its anchor point (PanelAt's group). */
-function cornersOf(name: PanelName): [number, number][] {
-  const box = LAYOUT[name];
-  const w = (box.widthPx * theme.panel.pixelSize) / 2;
-  const h = box.heightPx * theme.panel.pixelSize;
-  const [top, bottom] = box.anchor === "top" ? [0, -h] : [h / 2, -h / 2];
-  return [
-    [-w, bottom],
-    [w, bottom],
-    [w, top],
-    [-w, top],
-  ];
-}
-
-const CORNERS = Object.fromEntries((Object.keys(LAYOUT) as PanelName[]).map((n) => [n, cornersOf(n)])) as Record<
+const CORNERS = Object.fromEntries((Object.keys(LAYOUT) as PanelName[]).map((n) => [n, localCorners(LAYOUT[n])])) as Record<
   PanelName,
   [number, number][]
 >;
@@ -57,6 +42,7 @@ export function ViewProbe({ rigRef, registry }: { rigRef: RefObject<Group | null
     framesOutOfView: 0,
     headYawDeg: 0,
     rigYawDeg: 0,
+    probeError: null,
   });
   const broken = useRef(false);
 
@@ -67,6 +53,11 @@ export function ViewProbe({ rigRef, registry }: { rigRef: RefObject<Group | null
     } catch (error) {
       broken.current = true;
       console.error("The view probe stopped", error);
+      // Never leave the last good reading standing: a test must see that measuring stopped.
+      const v = view.current;
+      v.panelInView = false;
+      v.probeError = error instanceof Error ? error.message : String(error);
+      if (window.__hud) window.__hud.view = v;
     }
   });
 

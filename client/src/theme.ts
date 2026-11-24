@@ -93,6 +93,8 @@ export const theme = {
     frequencyHz: 660,
     durationS: 0.25,
     gain: 0.2,
+    /** The level the beep fades to (an exponential fade cannot reach 0). */
+    floorGain: 0.0001,
   },
   /** The rig that carries the panels: it follows the head with a delay and only turns. */
   rig: {

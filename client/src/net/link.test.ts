@@ -9,6 +9,7 @@ class FakeSocket implements SocketLike {
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
   closed = false;
+  readyState = 1;
   sent: string[] = [];
   failSend = false;
 
@@ -396,6 +397,17 @@ describe("send", () => {
     sock(0).failSend = true;
     expect(link.send(ack)).toBe(false);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("could not send command ack_alert"), expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it("drops a command, with a warning, when the socket is closing but the link still says live", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { sock, link } = setup();
+    sock(0).message(msg());
+    sock(0).readyState = 2; // CLOSING: a browser would discard the data without an error
+    expect(link.send(ack)).toBe(false);
+    expect(sock(0).sent).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("dropped command ack_alert (socket is not open)"));
     warn.mockRestore();
   });
 

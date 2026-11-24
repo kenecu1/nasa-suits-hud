@@ -120,3 +120,12 @@ describe("bannerVm", () => {
     expect(() => bannerVm(state, "live")).not.toThrow();
   });
 });
+
+describe("bannerVm, acknowledged rows", () => {
+  it("says ACK and dims the action once acknowledged, and nothing before", () => {
+    const vm = bannerVm(stateWith([makeAlert("seen", "warning", { acked: true }), makeAlert("new", "warning")]), "live");
+    expect(vm.rows[0]).toMatchObject({ ackText: "ACK", actionColor: theme.color.label });
+    expect(vm.rows[1]).toMatchObject({ ackText: "", actionColor: theme.color.text });
+  });
+});
+

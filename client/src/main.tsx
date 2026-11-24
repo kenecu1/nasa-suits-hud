@@ -5,6 +5,7 @@ import { createIntentHandler, setIntentHandler, fireIntent } from "./input/dispa
 import { startKeyboard } from "./input/keyboard";
 import { wsUrl } from "./net/backendUrl";
 import { startLink } from "./net/link";
+import { unlockAudio } from "./scene/audio";
 import { useHud } from "./store";
 import { installTestHook } from "./testHook";
 
@@ -26,6 +27,9 @@ setIntentHandler(
   }),
 );
 const stopKeyboard = startKeyboard(fireIntent);
+
+// Browsers allow sound only after a key press or click (the Enter AR press counts).
+for (const type of ["keydown", "pointerdown"] as const) window.addEventListener(type, unlockAudio, { once: true });
 
 const container = document.getElementById("root");
 if (container === null) throw new Error("index.html has no #root element");

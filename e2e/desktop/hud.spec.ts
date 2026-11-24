@@ -69,6 +69,7 @@ test("warning: a fan failure raises a warning with a tone, and key A acknowledge
   await page.goto(PAGE);
   await hudIsLive(page);
   expect((await hud(page)).tones).toBe(0);
+  await page.keyboard.press("KeyQ"); // any key: browsers allow sound only after one
   await backend.start({ mode: "sim", scenario: "fan_failure", speed: 10 });
   await topAlertIs(page, "fan");
   const before = await hud(page);
@@ -81,6 +82,7 @@ test("warning: a fan failure raises a warning with a tone, and key A acknowledge
   });
   expect(before.panels.banner.topId).toBe("fan");
   expect(before.tones, "a new warning plays the tone once").toBe(1);
+  expect(before.tonesMissed).toBe(0);
   await screenshot(page, testInfo, "warning");
 
   await page.keyboard.press("KeyA");
@@ -97,6 +99,40 @@ test("warning: a fan failure raises a warning with a tone, and key A acknowledge
     .toBe(true);
   await expect.poll(async () => (await hud(page)).panels.banner.rows.find((r) => r.id === "fan")?.acked).toBe(true);
   expect((await hud(page)).tones, "acknowledging plays nothing").toBe(1);
+});
+
+test("decision B: after the fan is acknowledged, a new oxygen warning goes on top with a tone, and A acknowledges it, not the fan", async ({
+  page,
+  backend,
+}) => {
+  await page.goto(PAGE);
+  await hudIsLive(page);
+  await page.keyboard.press("KeyQ"); // any key: lets the page play sound
+  await backend.start({ mode: "sim", scenario: "fan_then_oxygen" });
+  await topAlertIs(page, "fan");
+  expect((await hud(page)).tones).toBe(1);
+  await page.keyboard.press("KeyA");
+  await expect.poll(async () => (await hud(page)).panels.banner.rows.find((r) => r.id === "fan")?.acked).toBe(true);
+
+  // The oxygen warning arrives: unacknowledged goes first, the fan sinks but stays listed.
+  await topAlertIs(page, "oxygen", 30_000);
+  const panels = (await hud(page)).panels;
+  expect(panels.banner.rows.map((r) => [r.id, r.acked])).toEqual([
+    ["oxygen", false],
+    ["fan", true],
+  ]);
+  expect(panels.banner.rows[0]?.action).toBe("DCU OXY to SEC, return to lander");
+  expect((await hud(page)).tones, "a new warning plays the tone again").toBe(2);
+
+  await page.keyboard.press("KeyA");
+  await expect.poll(async () => (await hud(page)).input.last?.command.args.id).toBe("oxygen");
+  await expect
+    .poll(async () => (await backend.state()).alerts.map((a) => [a.id, a.acked]), { timeout: 5000 })
+    .toEqual([
+      ["oxygen", true],
+      ["fan", true],
+    ]);
+  expect((await hud(page)).tones).toBe(2);
 });
 
 test("link lost: one link alert, every value stale, no suit alerts", async ({ page, backend }, testInfo) => {

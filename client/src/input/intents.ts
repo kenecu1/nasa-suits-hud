@@ -6,7 +6,9 @@ import type { HudPanels } from "../hud/types";
 
 export type Intent = Command["name"];
 
-export const INTENTS: readonly Intent[] = ["ack_alert", "toggle_details"];
+/** Every intent, once. A Record, so adding a command name to the contract fails to compile here. */
+const ALL: Record<Intent, true> = { ack_alert: true, toggle_details: true };
+export const INTENTS = Object.keys(ALL) as Intent[];
 
 /** Laptop keyboard, by `KeyboardEvent.code` (the key's place, whatever the layout prints on it). */
 export const KEYBOARD: Readonly<Record<string, Intent>> = {
@@ -35,6 +37,15 @@ export const XR_BUTTONS: readonly XrButtonBinding[] = [
  * acknowledged by mistake. With nothing on top it sends no id, and the backend acks its own top.
  */
 export function commandFor(intent: Intent, panels: HudPanels): Command {
-  if (intent === "ack_alert") return { type: "command", name: "ack_alert", args: { id: panels.banner.topId } };
-  return { type: "command", name: "toggle_details", args: { id: null } };
+  switch (intent) {
+    case "ack_alert":
+      return { type: "command", name: "ack_alert", args: { id: panels.banner.topId } };
+    case "toggle_details":
+      return { type: "command", name: "toggle_details", args: { id: null } };
+    default: {
+      // A new command name in the contract must get its own case, never fall into another.
+      const unhandled: never = intent;
+      throw new Error(`no command for intent ${String(unhandled)}`);
+    }
+  }
 }

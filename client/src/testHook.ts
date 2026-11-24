@@ -25,6 +25,8 @@ export interface HudView {
   /** Where the head and the rig point, degrees about the up axis (positive = left). */
   headYawDeg: number;
   rigYawDeg: number;
+  /** Set when measuring failed; the probe then stops and `panelInView` stays false. */
+  probeError: string | null;
 }
 
 export interface HudHook {
@@ -34,8 +36,9 @@ export interface HudHook {
   seq: number | null;
   /** The last intent fired (keyboard or controller) and what the link did with it. */
   input: InputLog;
-  /** How many times the warning tone has played. */
+  /** How many warning tones have played, and how many could not (audio locked or failed). */
   tones: number;
+  tonesMissed: number;
   /** null until the scene has drawn a frame. */
   view: HudView | null;
 }
@@ -47,10 +50,10 @@ declare global {
 }
 
 export function installTestHook(): () => void {
-  const read = (): Omit<HudHook, "view" | "tones"> => {
+  const read = (): Omit<HudHook, "view" | "tones" | "tonesMissed"> => {
     const { panels, conn, state, input } = useHud.getState();
     return { panels, conn, input, seq: typeof state?.seq === "number" ? state.seq : null };
   };
-  window.__hud = { ...read(), tones: 0, view: null };
+  window.__hud = { ...read(), tones: 0, tonesMissed: 0, view: null };
   return useHud.subscribe(() => Object.assign(window.__hud, read()));
 }

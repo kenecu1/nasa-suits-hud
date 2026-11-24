@@ -16,6 +16,8 @@ export interface SocketLike {
   onmessage: ((event: { data: unknown }) => void) | null;
   onclose: (() => void) | null;
   onerror: (() => void) | null;
+  /** WebSocket.readyState: 1 is OPEN. send() on a closing socket drops data without an error. */
+  readonly readyState: number;
   send(data: string): void;
   close(): void;
 }
@@ -39,6 +41,7 @@ export interface LinkOptions {
 }
 
 export const SILENCE_MS = 3000;
+const OPEN = 1; // WebSocket.OPEN, spelled out so tests need no browser
 const BACKOFF_FIRST_MS = 500;
 const BACKOFF_MAX_MS = 5000;
 
@@ -162,6 +165,11 @@ export function startLink(options: LinkOptions): Link {
     send(command: Command): boolean {
       if (stopped || socket === null || conn !== "live") {
         console.warn(`backend link: dropped command ${command.name} (link is ${stopped ? "stopped" : conn})`);
+        return false;
+      }
+      // "live" lasts up to SILENCE_MS after the socket started closing; a send then would vanish.
+      if (socket.readyState !== OPEN) {
+        console.warn(`backend link: dropped command ${command.name} (socket is not open)`);
         return false;
       }
       try {

@@ -14,6 +14,8 @@ export type PanelRegistry = Map<PanelName, Group>;
 export const PanelRegistryContext = createContext<PanelRegistry | null>(null);
 
 const { panel, color } = theme;
+/** One signal for every panel: made once, not on every render. */
+const BACKING = withOpacity(color.panel, panel.opacity);
 
 export function PanelAt({ name, children, fitHeight = false }: {
   name: PanelName;
@@ -23,10 +25,11 @@ export function PanelAt({ name, children, fitHeight = false }: {
 }) {
   const registry = useContext(PanelRegistryContext);
   const box = LAYOUT[name];
+  // A ref callback that returns its cleanup (React 19). On React 18 the cleanup would never
+  // run and a closed panel would stay registered.
   const register = useCallback(
     (group: Group | null) => {
-      if (registry === null) return undefined;
-      if (group === null) return undefined;
+      if (registry === null || group === null) return undefined;
       registry.set(name, group);
       return () => {
         if (registry.get(name) === group) registry.delete(name);
@@ -51,7 +54,7 @@ export function PanelAt({ name, children, fitHeight = false }: {
             padding={panel.padding}
             gap={panel.rowGap}
             borderRadius={panel.radius}
-            backgroundColor={withOpacity(color.panel, panel.opacity)}
+            backgroundColor={BACKING}
           >
             {children}
           </Container>

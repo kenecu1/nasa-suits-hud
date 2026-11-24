@@ -131,3 +131,22 @@ describe("consumablesVm", () => {
     expect(() => consumablesVm(deepFreeze(makeState()), "live")).not.toThrow();
   });
 });
+
+describe("consumablesVm, unknown and off rows", () => {
+  it.each(["scrubber_b_co2_storage", "coolant_storage"])("shows -- with an empty bar and the unknown look when %s has no number", (name) => {
+    const row = consumablesVm(withValue(name, makeValue(null, "unknown", "%")), "live").rows.find((r) => r.name === name);
+    expect(row).toMatchObject({ text: "--", fill: 0, level: "unknown", word: "NO DATA", wordText: "NO DATA" });
+  });
+
+  it("shows -- for a level word this client does not know, never a bare number", () => {
+    const odd = { value: 50, unit: "%", level: "critical" } as unknown as ReturnType<typeof makeValue>;
+    const row = consumablesVm(withValue("coolant_storage", odd), "live").rows.find((r) => r.name === "coolant_storage");
+    expect(row).toMatchObject({ text: "--", fill: 0, level: "unknown" });
+  });
+
+  it("draws an off row with its number, the dash and the word OFF", () => {
+    const row = consumablesVm(withValue("scrubber_a_co2_storage", makeValue(0, "off", "%")), "live").rows[4];
+    expect(row).toMatchObject({ name: "scrubber_a_co2_storage", text: "0%", level: "off", shape: "dash", wordText: "OFF" });
+  });
+});
+

@@ -1,42 +1,29 @@
-// The warning tone: a short beep from Web Audio when the tone view model says so. Draws nothing.
-import { useEffect, useRef } from "react";
+// The warning tone: a short beep for every new warning the store has counted. Draws nothing.
+// The store decides when (hud/tone.vm.ts, counted in store.ts), so a tone is neither lost when
+// two states arrive before React draws nor repeated when this component mounts again.
+import { useEffect } from "react";
 import { useHud } from "../store";
-import { theme } from "../theme";
+import { beep } from "./audio";
 
-let audio: AudioContext | null = null;
-
-function beep(): void {
-  audio ??= new AudioContext();
-  const ctx = audio;
-  // Browsers keep audio suspended until the page has had a click or key press; the first
-  // warning after that plays. A suspended context is not an error worth more than a line.
-  if (ctx.state === "suspended") {
-    ctx.resume().catch((error: unknown) => console.warn("tone: audio could not start", error));
-  }
-  const { frequencyHz, durationS, gain } = theme.tone;
-  const osc = ctx.createOscillator();
-  const level = ctx.createGain();
-  osc.frequency.value = frequencyHz;
-  level.gain.setValueAtTime(gain, ctx.currentTime);
-  level.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationS);
-  osc.connect(level).connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + durationS);
-}
+/** Module-level, not a ref: it must survive this component being rebuilt after a HUD crash. */
+let sounded = 0;
 
 export function Tone() {
-  const tone = useHud((s) => s.panels.tone);
-  const played = useRef<string | null>(null);
+  const due = useHud((s) => s.toneCount);
   useEffect(() => {
-    // Once per state: a rebuild for the same state (the link going live) does not replay it.
-    if (!tone.play || played.current === tone.key) return;
-    played.current = tone.key;
-    if (window.__hud) window.__hud.tones += 1;
+    if (due <= sounded) return;
+    sounded = due;
+    let result: "played" | "blocked" | "failed";
     try {
-      beep();
+      result = beep();
     } catch (error) {
       console.warn("tone: could not play the warning tone", error);
+      result = "failed";
     }
-  }, [tone]);
+    if (window.__hud) {
+      if (result === "played") window.__hud.tones += 1;
+      else window.__hud.tonesMissed += 1;
+    }
+  }, [due]);
   return null;
 }

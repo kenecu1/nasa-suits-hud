@@ -276,3 +276,11 @@ def test_ranges_refuse_an_active_when_position_the_dcu_does_not_have(tmp_path):
 
     with pytest.raises(RangesError, match="no position 'A'"):
         load_ranges(bad)
+
+
+def test_the_active_fan_reading_zero_is_a_warning_not_off():
+    # The real failure: the selected fan stops. It must never be mistaken for a switched-off one.
+    s = state(snapshot({"fan_pri_rpm": 0.0, "fan_sec_rpm": 0.0}))
+
+    assert s.suit.values["fan_pri_rpm"].level == Level.WARNING
+    assert s.suit.values["fan_sec_rpm"].level == Level.OFF

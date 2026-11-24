@@ -24,6 +24,10 @@ export interface BannerRow extends LevelLook {
   action: string;
   /** The wearer has acknowledged it (the backend says so). It stays listed until it clears. */
   acked: boolean;
+  /** "ACK" once acknowledged, else "". */
+  ackText: string;
+  /** The action line is dimmed once acknowledged. */
+  actionColor: string;
 }
 
 export interface BannerVm {
@@ -54,6 +58,11 @@ export interface ValueRow extends LevelLook {
   label: string;
   /** "92%", "3.95 psi", or "--" when there is no number. */
   text: string;
+  /**
+   * The word drawn beside the value: the level's word, or "" while nominal. Seven green
+   * "NOMINAL"s would be noise in a dim helmet; the circle and colour still say it.
+   */
+  wordText: string;
 }
 
 export interface BarRow extends ValueRow {

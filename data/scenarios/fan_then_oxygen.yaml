@@ -1,0 +1,9 @@
+description: >
+  The primary fan fails 2 s in, then an oxygen leak starts 15 s in (brief M2, question 1): the
+  wearer acknowledges the fan warning, then the oxygen warning arrives on top with a new tone,
+  and the next acknowledge must name the oxygen alert, never the fan again.
+steps:
+  - at: 2
+    fault: fan
+  - at: 15
+    fault: oxy

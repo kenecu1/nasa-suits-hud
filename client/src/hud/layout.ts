@@ -54,28 +54,33 @@ const DEG = Math.PI / 180;
 /** A point in the rig's frame, metres: x right, y up, the wearer looks down -z. */
 export type Point = [number, number, number];
 
-/**
- * The panel's four corners in the rig's frame, placed exactly as scene/PanelAt.tsx places them:
- * turned by yaw, tilted by pitch, then pushed out to the panel distance.
- */
-export function cornerPoints(box: PanelBox): Point[] {
+/** The panel's four corners in its own plane, metres from its anchor point (x right, y up). */
+export function localCorners(box: PanelBox): [number, number][] {
   const w = (box.widthPx * theme.panel.pixelSize) / 2;
   const h = box.heightPx * theme.panel.pixelSize;
   const [top, bottom] = box.anchor === "top" ? [0, -h] : [h / 2, -h / 2];
-  const pitch = box.pitchDeg * DEG;
-  const yaw = box.yawDeg * DEG;
-  const z0 = -theme.rig.distanceM;
-  const flat: [number, number][] = [
+  return [
     [-w, bottom],
     [w, bottom],
     [w, top],
     [-w, top],
   ];
-  return flat.map(([x, y]): Point => {
-    const y1 = y * Math.cos(pitch) - z0 * Math.sin(pitch);
-    const z1 = y * Math.sin(pitch) + z0 * Math.cos(pitch);
-    return [x * Math.cos(yaw) + z1 * Math.sin(yaw), y1, -x * Math.sin(yaw) + z1 * Math.cos(yaw)];
-  });
+}
+
+/** A point of the panel's plane in the rig's frame, placed as scene/PanelAt.tsx places it:
+ * turned by yaw, tilted by pitch, then pushed out to the panel distance. */
+function toRig(box: PanelBox, x: number, y: number): Point {
+  const pitch = box.pitchDeg * DEG;
+  const yaw = box.yawDeg * DEG;
+  const z0 = -theme.rig.distanceM;
+  const y1 = y * Math.cos(pitch) - z0 * Math.sin(pitch);
+  const z1 = y * Math.sin(pitch) + z0 * Math.cos(pitch);
+  return [x * Math.cos(yaw) + z1 * Math.sin(yaw), y1, -x * Math.sin(yaw) + z1 * Math.cos(yaw)];
+}
+
+/** The panel's four corners in the rig's frame. */
+export function cornerPoints(box: PanelBox): Point[] {
+  return localCorners(box).map(([x, y]) => toRig(box, x, y));
 }
 
 /** Yaw (positive = left) and pitch (positive = up) of a point seen from the rig's centre, degrees. */
@@ -83,9 +88,23 @@ function anglesOf([x, y, z]: Point): [number, number] {
   return [Math.atan2(-x, -z) / DEG, Math.atan2(y, Math.hypot(x, z)) / DEG];
 }
 
-/** The smallest box of directions that holds the whole panel (its corners are its extremes). */
+const EDGE_STEPS = 16;
+
+/**
+ * The smallest box of directions that holds the whole panel. Yaw is extreme at a corner, but the
+ * pitch of a straight edge peaks between its corners, so points along every edge are measured.
+ */
 export function angleBox(box: PanelBox): AngleBox {
-  const angles = cornerPoints(box).map(anglesOf);
+  const c = localCorners(box);
+  const angles: [number, number][] = [];
+  for (let i = 0; i < c.length; i++) {
+    const [ax, ay] = c[i] as [number, number];
+    const [bx, by] = c[(i + 1) % c.length] as [number, number];
+    for (let s = 0; s < EDGE_STEPS; s++) {
+      const f = s / EDGE_STEPS;
+      angles.push(anglesOf(toRig(box, ax + (bx - ax) * f, ay + (by - ay) * f)));
+    }
+  }
   const yaws = angles.map((a) => a[0]);
   const pitches = angles.map((a) => a[1]);
   return { left: Math.max(...yaws), right: Math.min(...yaws), top: Math.max(...pitches), bottom: Math.min(...pitches) };
@@ -122,7 +141,8 @@ export const EYES: readonly Eye[] = [
   { name: "right eye", eyeX: view.eyeOffsetM, tanX: view.eyeTanX, tanY: view.eyeTanY },
 ];
 
-/** How far out the panel reaches in this eye's picture: 1 is the edge, above 1 is cut off. */
+/** How far out the panel reaches in this eye's picture: 1 is the edge, above 1 is cut off.
+ * Corners suffice here: straight edges stay straight in a flat picture. */
 export function reach(box: PanelBox, eye: Eye): number {
   const out = cornerPoints(box).map(([x, y, z]) =>
     Math.max(Math.abs((x - eye.eyeX) / -z) / eye.tanX, Math.abs(y / -z) / eye.tanY),

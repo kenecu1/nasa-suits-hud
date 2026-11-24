@@ -50,14 +50,18 @@ export function rangeOf(name: string): RangeEntry | undefined {
 }
 
 /**
- * Round toward the limit that matters, so the text never looks safer than the value: a value
- * checked low is floored (19.6% must not read "20%" when 20 is the limit), one checked high is
- * rounded up, anything else to the nearest.
+ * Round toward the limit that matters, so the text never looks safer than the value: 19.6% must
+ * not read "20%" when 20 is the minimum, and 160.4 bpm must not read "160" when 160 is the
+ * maximum. Below the minimum: down. Above the maximum: up. Inside the range a value checked
+ * low goes down and one checked high goes up (near a limit, as M1 did); otherwise the nearest.
  */
-function roundingOf(name: string): Rounding {
-  const check = rangeOf(name)?.check;
-  if (check === "low") return "floor";
-  if (check === "high") return "ceil";
+function roundingOf(name: string, value: number): Rounding {
+  const range = rangeOf(name);
+  if (range === undefined) return "round";
+  if (value < range.min) return "floor";
+  if (value > range.max) return "ceil";
+  if (range.check === "low") return "floor";
+  if (range.check === "high") return "ceil";
   return "round";
 }
 
@@ -119,7 +123,7 @@ export function valueText(name: string, value: number | null, unit: string): str
   if (value === null) return NO_NUMBER;
   const format = formatOf(name);
   if (format.duration) return formatDuration(value);
-  const number = formatNumber(value, format.decimals, roundingOf(name));
+  const number = formatNumber(value, format.decimals, roundingOf(name, value));
   if (unit === "") return number;
   return unit === "%" ? `${number}%` : `${number} ${unit}`;
 }
@@ -127,5 +131,6 @@ export function valueText(name: string, value: number | null, unit: string): str
 /** One value as a row: label, text and the look of its level. */
 export function valueRow(state: State | null, name: string, conn: Conn): ValueRow {
   const { value, unit, level } = readValue(state, name, conn);
-  return { name, label: formatOf(name).label, text: valueText(name, value, unit), ...lookOf(level) };
+  const look = lookOf(level);
+  return { name, label: formatOf(name).label, text: valueText(name, value, unit), wordText: level === "nominal" ? "" : look.word, ...look };
 }

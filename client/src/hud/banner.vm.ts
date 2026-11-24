@@ -1,6 +1,7 @@
 // The alert banner: up to three alerts, in the order the backend sent them, plus "+N MORE".
 // The backend decides severity and order (unacknowledged first); this only picks the look.
 import type { Alert, Level, State } from "../contract.gen";
+import { theme } from "../theme";
 import type { BannerRow, BannerVm, Conn } from "./types";
 import { lookOf } from "./values";
 
@@ -24,6 +25,8 @@ export function bannerVm(state: State | null, conn: Conn): BannerVm {
     title: text(alert.title),
     action: text(alert.action),
     acked: alert.acked === true,
+    ackText: alert.acked === true ? "ACK" : "",
+    actionColor: alert.acked === true ? theme.color.label : theme.color.text,
     ...lookOf(live ? levelOf(alert.severity) : "stale"),
   }));
   const more = Math.max(0, alerts.length - BANNER_ROWS);

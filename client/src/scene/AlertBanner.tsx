@@ -24,10 +24,10 @@ export function AlertBanner() {
               {row.title}
             </Text>
             <Text fontSize={font.word} fontWeight="medium" color={color.label}>
-              {row.acked ? "ACK" : ""}
+              {row.ackText}
             </Text>
           </Container>
-          <Text fontSize={font.row} color={row.acked ? color.label : color.text}>
+          <Text fontSize={font.row} color={row.actionColor}>
             {row.action}
           </Text>
         </Container>
