@@ -150,3 +150,53 @@ def test_values_go_stale_as_soon_as_the_link_is_unreachable():
 
     assert s.suit.values["oxy_pri_storage"].level == Level.STALE
     assert s.suit.values["oxy_pri_storage"].value == 92.0
+
+
+# ---- M2: link level, and preview never changes the AlertBook ----
+
+
+@pytest.mark.parametrize("link, level", [
+    (LinkStatus.OK, "nominal"), (LinkStatus.STALE, "stale"), (LinkStatus.UNREACHABLE, "warning"),
+    (LinkStatus.UNASSIGNED, "warning"), (LinkStatus.BAD_DATA, "warning"),
+])
+def test_the_backend_decides_the_links_level(link, level):
+    assert state(snapshot(link=link)).link.level == level
+
+
+def off_nominal(arrival: int) -> TssSnapshot:
+    return snapshot(telemetry={"heart_rate": 170.0}, arrivals={"telemetry": arrival})
+
+
+def test_preview_does_not_advance_the_alertbook_however_often_it_runs():
+    store = Store(Mode.SIM)
+    store.observe(off_nominal(1))
+    book = store.book
+
+    for arrival in (2, 3, 4):
+        assert [a.id for a in store.preview(off_nominal(arrival)).alerts] == ["heart_rate"]
+
+    assert store.book is book  # unchanged: only observe moves it
+
+
+def test_observe_counts_one_arrival_once():
+    store = Store(Mode.SIM)
+    store.observe(off_nominal(1))
+    store.observe(off_nominal(1))
+    store.observe(off_nominal(1))
+
+    assert store.preview(off_nominal(1)).alerts == ()  # 1 sample, not 3
+    store.observe(off_nominal(2))
+    assert [a.id for a in store.preview(off_nominal(2)).alerts] == ["heart_rate"]
+
+
+def test_clearing_is_counted_even_when_no_state_is_sent_in_between():
+    # The publisher sends only on change or heartbeat; constant nominal values change nothing
+    # after the first, but each arrival must still count toward the 3 that clear an alert.
+    store = Store(Mode.SIM)
+    for arrival in (1, 2):
+        store.observe(off_nominal(arrival))
+    calm = {"heart_rate": 92.0}
+    for arrival in (3, 4, 5):
+        store.observe(snapshot(telemetry=calm, arrivals={"telemetry": arrival}))
+
+    assert store.preview(snapshot(telemetry=calm, arrivals={"telemetry": 5})).alerts == ()

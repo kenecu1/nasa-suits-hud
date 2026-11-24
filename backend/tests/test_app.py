@@ -250,3 +250,105 @@ def test_a_failing_cleanup_does_not_hide_why_startup_failed(monkeypatch):
         create_app(Settings(mode=Mode.SIM))
     ):
         pass
+
+
+# ---- M2: Origin check and commands over /ws ----
+
+
+@pytest.mark.parametrize("origin", [
+    "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5183",
+    "https://localhost:5173", "http://localhost:5173/",
+])
+def test_the_huds_own_origins_may_connect(client, origin):
+    with client.websocket_connect("/ws", headers={"origin": origin}) as ws:
+        assert ws.receive_json()["type"] == "state"
+
+
+def test_a_client_without_an_origin_header_may_connect(client):
+    # scripts and tests are not a browser being misused
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "state"
+
+
+@pytest.mark.parametrize("origin", [
+    "http://evil.example", "http://localhost:8080", "http://localhost.evil.example:5173",
+    "null", "file://",
+])
+def test_any_other_origin_is_refused_before_the_socket_opens(client, origin, caplog):
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect) as refused:
+        with client.websocket_connect("/ws", headers={"origin": origin}):
+            pass
+
+    assert refused.value.code == 1008
+    assert "refused a /ws connection" in caplog.text
+    assert client.app.state.runtime.publisher.subscriber_count == 0
+
+
+def test_an_origin_listed_in_settings_may_connect():
+    settings = Settings(mode=Mode.SIM, extra_origins=("https://192.168.1.20:5173",))
+    with TestClient(create_app(settings)) as c:
+        with c.websocket_connect("/ws", headers={"origin": "https://192.168.1.20:5173"}) as ws:
+            assert ws.receive_json()["type"] == "state"
+
+
+def test_settings_read_ports_and_extra_origins_from_the_environment():
+    settings = Settings.from_env({"SUITS_CLIENT_PORT": "6000",
+                                  "SUITS_ALLOWED_ORIGINS": "https://10.0.0.5:6000/, http://a:1"})
+
+    assert "http://localhost:6000" in settings.allowed_origins()
+    assert "http://localhost:5173" not in settings.allowed_origins()
+    assert {"https://10.0.0.5:6000", "http://a:1"} <= settings.allowed_origins()
+
+
+@pytest.mark.parametrize("env", [
+    {"SUITS_CLIENT_PORT": "abc"}, {"SUITS_CLIENT_PORT": "70000"},
+    {"SUITS_ALLOWED_ORIGINS": "192.168.1.20:5173"},
+    {"SUITS_MODE": "replay", "SUITS_RECORDING": "backend/tests/fixtures/captured-tss.jsonl",
+     "SUITS_SCENARIO": "fan_failure"},
+    {"SUITS_SCENARIO_SPEED": "0"},
+])
+def test_bad_origin_and_scenario_settings_are_refused(env):
+    with pytest.raises(SettingsError):
+        Settings.from_env(env)
+
+
+def test_ack_alert_over_the_socket_marks_the_alert_in_the_next_state(client):
+    fake = client.app.state.runtime.fake_tss
+    sim = client.app.state.runtime.sim
+    with client.websocket_connect("/ws") as ws:
+        receive_until(ws, lambda m: m["link"]["tss"] == "ok", timeout=5)
+        sim.dynamics.set_fault("oxy")
+        msg, _ = receive_until(ws, lambda m: any(a["id"] == "oxygen" for a in m["alerts"]),
+                               timeout=6)
+        assert msg["alerts"][0]["acked"] is False
+        assert fake.state["error"]["oxy_error"] is True
+
+        ws.send_json({"type": "command", "name": "ack_alert", "args": {"id": "oxygen"}})
+        msg, waited = receive_until(
+            ws, lambda m: any(a["id"] == "oxygen" and a["acked"] for a in m["alerts"]), timeout=2)
+
+    assert waited < 1.0  # notify_change: about 100 ms, not the next heartbeat
+
+
+def test_toggle_details_over_the_socket_and_bad_frames_do_not_close_it(client, caplog):
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        ws.send_text("garbage")
+        ws.send_bytes(b"\x00\x01")
+        ws.send_json({"type": "command", "name": "toggle_details", "args": {}})
+        msg, _ = receive_until(ws, lambda m: m["ui"]["details_open"], timeout=2)
+
+    assert msg["ui"]["details_open"] is True
+    assert "dropped an invalid command" in caplog.text
+    assert "dropped a binary /ws frame" in caplog.text
+
+
+def test_the_state_carries_link_level_alerts_and_ui(client):
+    with client.websocket_connect("/ws") as ws:
+        msg, _ = receive_until(ws, lambda m: m["link"]["tss"] == "ok", timeout=5)
+
+    assert msg["link"]["level"] == "nominal"
+    assert msg["alerts"] == []
+    assert msg["ui"] == {"details_open": False}

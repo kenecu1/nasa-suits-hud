@@ -5,8 +5,9 @@
     npm run tss:smoke -- --seconds 60 --record     the 60 s recording for a replay fixture
 
 It uses the same adapter as the backend (suits.tss), so if this prints sensible values the
-backend's live mode will too. Exit code 0 means DCU, UIA and telemetry all arrived and are
-still fresh; anything else exits 1 and says what is missing.
+backend's live mode will too. Exit code 0 means DCU, UIA and telemetry all arrived, are
+still fresh, and telemetry has every expected name (suits/tss/mapping.py); anything else
+exits 1 and says what is missing.
 
 The real TSS answers status and faults only about every 7 s
 (docs/notes/tss-legacy-port-is-slow.md), so after a 5 s run the link is often still "stale"
@@ -97,6 +98,10 @@ def missing(snapshot: TssSnapshot) -> list[str]:
             problems.append(label)
         elif age > STALE_AFTER_S[section]:
             problems.append(f"{label} (last seen {age:.1f} s ago)")
+    if snapshot.missing:
+        # decision A in docs/briefs/M2.md: a renamed TSS field must not pass quietly
+        problems.append(f"telemetry names {', '.join(snapshot.missing)} (renamed by the TSS? "
+                        "translate them in backend/suits/tss/mapping.py RENAMED)")
     return problems
 
 

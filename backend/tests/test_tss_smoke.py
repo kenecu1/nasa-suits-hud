@@ -50,6 +50,19 @@ async def test_smoke_passes_while_the_slow_sections_are_still_on_their_way(capsy
     assert "Not received yet: status, faults" in out
 
 
+async def test_smoke_fails_and_names_an_expected_telemetry_name_that_is_missing(capsys):
+    # decision A in docs/briefs/M2.md: a renamed TSS field must make the smoke test fail
+    async with FakeTss() as fake:
+        fake.state["telemetry"]["primary_oxygen"] = fake.state["telemetry"].pop("oxy_pri_storage")
+        code = await tss_smoke.smoke(address_of(fake), seconds=2.5, every_s=0.5)
+
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "FAILED: link is bad_data" in out
+    assert "telemetry names oxy_pri_storage" in out
+    assert "RENAMED" in out
+
+
 async def test_smoke_fails_when_required_data_stops_arriving(capsys):
     async with FakeTss() as fake:
         task = asyncio.ensure_future(tss_smoke.smoke(address_of(fake), seconds=4.5, every_s=0.5))
