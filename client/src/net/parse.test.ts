@@ -8,11 +8,13 @@ function makeState(): State {
     v: 2,
     seq: 1,
     t: 100,
-    link: { tss: "ok", age_s: 0.2, mode: "sim" },
+    link: { tss: "ok", age_s: 0.2, mode: "sim", level: "nominal" },
     eva: { started: false, elapsed_s: 0, phase: null },
     suit: { values: { oxy_pri_storage: { value: 92, unit: "%", level: "nominal" } }, faults: null },
     dcu: { batt: "LOCAL", oxy: "PRI", comm: "A", fan: "PRI", pump: "OPEN", co2: "A" },
     uia: null,
+    alerts: [],
+    ui: { details_open: false },
   };
 }
 
