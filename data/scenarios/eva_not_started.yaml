@@ -1,0 +1,6 @@
+description: >
+  Before the EVA: the TSS says not started. Values show, no suit alerts.
+steps:
+  - at: 0
+    set:
+      status.started: false

@@ -1,0 +1,8 @@
+description: >
+  The fake TSS goes silent 8 s in (no replies, no pushes), after the link has settled (about
+  3 s after a start), and comes back at 16 s.
+steps:
+  - at: 8
+    link: lost
+  - at: 16
+    link: back

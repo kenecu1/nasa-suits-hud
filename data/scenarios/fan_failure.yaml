@@ -1,0 +1,6 @@
+description: >
+  The primary fan fails 2 s in. Its rpm winds down and helmet CO2 builds; the TSS raises
+  fan_error. The fix is the wearer's: DCU FAN to SEC (the scenario does not do it).
+steps:
+  - at: 2
+    fault: fan

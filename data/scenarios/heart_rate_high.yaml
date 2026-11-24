@@ -1,0 +1,6 @@
+description: >
+  Heart rate rises into the caution band (above 149 bpm) 2 s in: a caution with "Slow down".
+steps:
+  - at: 2
+    set:
+      telemetry.heart_rate: 152

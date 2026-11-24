@@ -1,6 +1,7 @@
 """Wiring: build the pieces for one mode, start them, stop them. No mission logic.
 
 sim     fake TSS on localhost  -> TssClient -> TssSource -> Store -> Publisher
+        (+ SimDriver: the TSS's fault rules and an optional scenario, on the fake's state)
 replay  recording file         -> Replayer  -> TssSource -> Store -> Publisher
 live    NASA's TSS             -> TssClient -> TssSource -> Store -> Publisher
 """
@@ -18,6 +19,7 @@ from suits.core.store import Store
 from suits.paths import RECORDINGS_DIR
 from suits.settings import Settings
 from suits.sim.fake_tss import FakeTss
+from suits.sim.scenarios import SimDriver, load_scenario
 from suits.tasks import cancel_all, dead, spawn
 from suits.tss.client import TssAddress, TssClient
 from suits.tss.recorder import Recorder, Replayer
@@ -33,6 +35,7 @@ class Runtime:
     store: Store
     publisher: Publisher
     fake_tss: FakeTss | None = None  # sim mode only: tests change its values
+    sim: SimDriver | None = None  # sim mode only: fault rules and the scenario
     client: TssClient | None = None
     replayer: Replayer | None = None
     recorder: Recorder | None = None
@@ -99,6 +102,11 @@ async def _start(runtime: Runtime, settings: Settings) -> None:
     if settings.mode == Mode.SIM:
         runtime.fake_tss = FakeTss(legacy_service_s=SIM_LEGACY_SERVICE_S)
         await runtime.fake_tss.start()
+        scenario = load_scenario(settings.scenario) if settings.scenario else None
+        runtime.sim = SimDriver(runtime.fake_tss, scenario, settings.scenario_speed)
+        runtime.tasks.append(spawn(runtime.sim.run(), "sim"))
+        if scenario is not None:
+            log.info("playing scenario %s at %sx", scenario.name, settings.scenario_speed)
         address = TssAddress("127.0.0.1", runtime.fake_tss.sub_port, runtime.fake_tss.legacy_port)
     elif settings.mode == Mode.LIVE:
         assert settings.tss_host is not None

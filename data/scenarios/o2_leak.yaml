@@ -1,0 +1,6 @@
+description: >
+  An oxygen leak on the primary tank 2 s in: suit O2 pressure falls and the tank drains; the
+  TSS raises oxy_error. The fix is the wearer's: DCU OXY to SEC.
+steps:
+  - at: 2
+    fault: oxy

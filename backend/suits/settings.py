@@ -53,6 +53,8 @@ class Settings:
     client_port: int = DEFAULT_CLIENT_PORT  # SUITS_CLIENT_PORT: the page's port
     e2e_client_port: int = DEFAULT_E2E_CLIENT_PORT  # SUITS_E2E_CLIENT_PORT: Playwright's page
     extra_origins: tuple[str, ...] = ()  # SUITS_ALLOWED_ORIGINS, e.g. the headset's address
+    scenario: str | None = None  # SUITS_SCENARIO: sim only, data/scenarios/<name>.yaml
+    scenario_speed: float = 1.0  # SUITS_SCENARIO_SPEED
 
     def allowed_origins(self) -> frozenset[str]:
         """Browser origins that may open /ws: the HUD's own pages (docs/briefs/M2.md, 8.5).
@@ -86,6 +88,17 @@ class Settings:
             raise SettingsError(f"bad number in settings: {exc}") from None
         if not (math.isfinite(speed) and speed > 0):
             raise SettingsError(f"SUITS_REPLAY_SPEED must be a positive number, got {speed}")
+        scenario = env.get("SUITS_SCENARIO") or None
+        if scenario is not None and mode != Mode.SIM:
+            raise SettingsError("SUITS_SCENARIO plays on the built-in fake TSS: sim mode only")
+        try:
+            scenario_speed = float(env.get("SUITS_SCENARIO_SPEED") or "1")
+        except ValueError:
+            raise SettingsError("SUITS_SCENARIO_SPEED must be a number") from None
+        if not (math.isfinite(scenario_speed) and scenario_speed > 0):
+            raise SettingsError(
+                f"SUITS_SCENARIO_SPEED must be a positive number, got {scenario_speed}"
+            )
         if not 0 <= team <= 9:
             raise SettingsError(f"TSS_TEAM must be 0-9, got {team}")
         return cls(
@@ -98,4 +111,6 @@ class Settings:
             client_port=_port(env, "SUITS_CLIENT_PORT", DEFAULT_CLIENT_PORT),
             e2e_client_port=_port(env, "SUITS_E2E_CLIENT_PORT", DEFAULT_E2E_CLIENT_PORT),
             extra_origins=_origins(env.get("SUITS_ALLOWED_ORIGINS", "")),
+            scenario=scenario,
+            scenario_speed=scenario_speed,
         )
