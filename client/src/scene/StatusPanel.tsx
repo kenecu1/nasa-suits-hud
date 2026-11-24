@@ -25,9 +25,10 @@ export function StatusPanel() {
           {link.label}
         </Text>
         <LevelShape shape={link.shape} color={link.color} size={panel.shapeSize} />
-        <Text fontSize={font.row} fontWeight="bold" color={link.color} flexGrow={1} flexShrink={1}>
+        <Text fontSize={font.row} fontWeight="bold" color={link.color}>
           {link.text}
         </Text>
+        <Container flexGrow={1} />
         <Text fontSize={font.label} fontWeight="medium" color={color.label}>
           {link.mode ?? ""}
         </Text>

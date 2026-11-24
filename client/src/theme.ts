@@ -81,7 +81,7 @@ export const theme = {
     shapeSize: 24,
     columnGap: 24,
     /** Room for the longest level word ("WARNING", "NO DATA") so numbers line up. */
-    wordWidth: 140,
+    wordWidth: 130,
     barWidth: 90,
     barHeight: 12,
     limitWidth: 4,
@@ -100,20 +100,24 @@ export const theme = {
     followS: 0.35, // time for the rig to close about 63% of the gap to the head's direction
   },
   /**
-   * Where panels may go, in degrees from the rig's forward direction (yaw positive = to the
-   * wearer's left, pitch positive = up). The centre stays clear (acceptance 8). Every panel must
-   * fit inside `view`: the laptop camera sees ±30° up and down, an emulated Quest 3 eye about
-   * ±41° sideways, less the eye's offset from the head's centre.
+   * Where panels may go (hud/layout.ts). Angles from the rig's forward direction: yaw positive
+   * = to the wearer's left, pitch positive = up. The centre stays clear (acceptance 8). Every
+   * panel must fit the laptop picture (1280 x 720 in the tests) and both eyes of the emulated
+   * Quest 3 (iwer: 90° tall, 640 x 720 per eye, eyes 32 mm either side of the head's centre).
    */
   view: {
     clearYawDeg: 15,
     clearPitchDeg: 10,
-    maxYawDeg: 39,
-    maxPitchDeg: 28,
+    laptopAspect: 1280 / 720,
+    eyeTanX: 640 / 720,
+    eyeTanY: 1,
+    eyeOffsetM: 0.032,
+    /** Keep this much of each picture's edge free, so a panel never sits right on it. */
+    edgeMargin: 0.98,
   },
-  /** Laptop view: a fixed camera at standing eye height. */
+  /** Laptop view: a fixed camera at standing eye height. Wide, so every panel fits on a laptop. */
   camera: {
-    fovDeg: 60,
+    fovDeg: 70,
     eyeHeightM: 1.6,
     near: 0.05,
     far: 50,

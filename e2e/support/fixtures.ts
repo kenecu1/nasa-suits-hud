@@ -5,6 +5,7 @@ import { Backend } from "./backend";
 import { BACKEND_PORT } from "./ports";
 
 export { expect };
+export type { Page };
 
 /** The page with the built-in emulator panel off (client/src/scene/xr.ts). */
 export const PAGE = "/?emulator=off";

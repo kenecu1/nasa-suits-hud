@@ -16,7 +16,7 @@ export function ValueLine({ row, valueSize = font.row, children }: {
   children?: ReactNode;
 }) {
   return (
-    <Container flexDirection="row" alignItems="center" gap={panel.gap}>
+    <Container flexDirection="row" alignItems="center" gap={panel.gap} flexShrink={0}>
       <LevelShape shape={row.shape} color={row.color} size={panel.shapeSize} />
       <Text fontSize={font.label} fontWeight="medium" color={color.label} flexGrow={1} flexShrink={1}>
         {row.label}

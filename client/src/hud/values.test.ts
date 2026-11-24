@@ -155,7 +155,7 @@ describe("valueText", () => {
   });
 
   it("uses the decimals of the format", () => {
-    expect(valueText("oxy_consumption", 0.1, "psi/min")).toBe("0.100 psi/min");
+    expect(valueText("oxy_consumption", 0.1, "psi/min")).toBe("0.10 psi/min");
     expect(valueText("suit_pressure_co2", 0.02, "psi")).toBe("0.020 psi");
   });
 

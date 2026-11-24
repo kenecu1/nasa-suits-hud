@@ -10,7 +10,8 @@ export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 /** The real TSS run recorded in M1: oxygen drains from about 90%, unlike the sim's fixed 92. */
 export const REAL_RECORDING = join(ROOT, "data", "recordings", "real-tss-6293795.jsonl");
 
-export type BackendMode = { mode: "sim" } | { mode: "replay"; recording: string };
+/** Sim mode, optionally playing data/scenarios/<scenario>.yaml at `speed` times real time. */
+export type BackendMode = { mode: "sim"; scenario?: string; speed?: number } | { mode: "replay"; recording: string };
 
 const STOP_GRACE_MS = 5000;
 
@@ -71,10 +72,24 @@ export class Backend {
       SUITS_MODE: wanted.mode,
       SUITS_RECORDING: wanted.mode === "replay" ? wanted.recording : "",
       SUITS_RECORD: "",
+      SUITS_SCENARIO: wanted.mode === "sim" ? (wanted.scenario ?? "") : "",
+      SUITS_SCENARIO_SPEED: wanted.mode === "sim" && wanted.speed !== undefined ? String(wanted.speed) : "",
     };
     const child = spawn(
       venvPython(),
-      ["-m", "uvicorn", "--factory", "suits.app:create_app", "--host", "127.0.0.1", "--port", String(this.port)],
+      [
+        "-m",
+        "uvicorn",
+        "--factory",
+        "suits.app:create_app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        String(this.port),
+        // As in `npm run dev`: the backend refuses bigger frames than a command needs.
+        "--ws-max-size",
+        "65536",
+      ],
       { cwd: ROOT, env, stdio: ["ignore", "pipe", "pipe"] },
     );
     const keep = (chunk: unknown) => {

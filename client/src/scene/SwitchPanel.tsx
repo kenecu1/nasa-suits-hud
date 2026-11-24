@@ -14,7 +14,7 @@ function Column({ label, rows }: { label: string; rows: SwitchRow[] }) {
         {label}
       </Text>
       {rows.map((row) => (
-        <Container key={row.label} flexDirection="row" justifyContent="space-between" gap={panel.gap}>
+        <Container key={row.label} flexDirection="row" justifyContent="space-between" gap={panel.gap} flexShrink={0}>
           <Text fontSize={font.label} fontWeight="medium" color={color.label}>
             {row.label}
           </Text>

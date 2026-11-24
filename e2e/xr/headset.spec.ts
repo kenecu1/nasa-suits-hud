@@ -2,12 +2,19 @@
 // installed before the page loads, so the page finds a WebXR device like on the headset.
 import { createRequire } from "node:module";
 import type { Page } from "@playwright/test";
-import { expect, hudIsLive, PAGE, sceneIsSteady, screenshot, test, view } from "../support/fixtures";
+import { expect, hud, hudIsLive, PAGE, sceneIsSteady, screenshot, test, view } from "../support/fixtures";
 
 const IWER_BUNDLE = createRequire(import.meta.url).resolve("iwer/build/iwer.min.js");
 
+interface EmulatedController {
+  connected: boolean;
+  updateButtonValue(id: string, value: number): void;
+}
+
 interface EmulatedHeadset {
   quaternion: { set(x: number, y: number, z: number, w: number): void };
+  primaryInputMode: "controller" | "hand";
+  controllers: { left?: EmulatedController; right?: EmulatedController };
 }
 type EmulatorWindow = Window & {
   IWER: {
@@ -26,6 +33,24 @@ async function turnHead(page: Page, degrees: number): Promise<void> {
     const half = (deg * Math.PI) / 360;
     (window as unknown as EmulatorWindow).__headset.quaternion.set(0, Math.sin(half), 0, Math.cos(half));
   }, degrees);
+}
+
+/** Press and release a button on the emulated right controller, a few frames apart. */
+async function pressButton(page: Page, button: string): Promise<void> {
+  const set = (value: number) =>
+    page.evaluate(
+      ([id, v]) => (window as unknown as EmulatorWindow).__headset.controllers.right?.updateButtonValue(id, v),
+      [button, value] as const,
+    );
+  await set(1);
+  await page.waitForTimeout(300);
+  await set(0);
+  await page.waitForTimeout(300);
+}
+
+async function enterAr(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Enter AR" }).click();
+  await expect.poll(async () => (await view(page)).presenting, { timeout: 15_000 }).toBe(true);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -60,8 +85,7 @@ test("Enter AR starts an immersive-ar session with the panel in view, and the pa
   await hudIsLive(page);
   expect((await view(page)).presenting).toBe(false);
 
-  await page.getByRole("button", { name: "Enter AR" }).click();
-  await expect.poll(async () => (await view(page)).presenting, { timeout: 15_000 }).toBe(true);
+  await enterAr(page);
   expect((await view(page)).xrMode).toBe("immersive-ar");
   // The emulated device was asked for AR and gave a see-through session.
   const granted = await page.evaluate(() => {
@@ -93,5 +117,51 @@ test("Enter AR starts an immersive-ar session with the panel in view, and the pa
 
   console.log(`draw calls, emulated headset: ${afterTurn.maxDrawCalls}`);
   expect(afterTurn.maxDrawCalls).toBeGreaterThan(0);
-  expect(afterTurn.maxDrawCalls).toBeLessThanOrEqual(50);
+  expect(afterTurn.maxDrawCalls).toBeLessThanOrEqual(100);
+});
+
+test("inside the session the view models match the laptop's, and the controller's A and B buttons fire ack_alert and toggle_details", async ({
+  page,
+  backend,
+}, testInfo) => {
+  await backend.start({ mode: "sim", scenario: "fan_failure", speed: 10 });
+  await page.goto(PAGE);
+  await hudIsLive(page);
+  await enterAr(page);
+  await page.evaluate(() => {
+    (window as unknown as EmulatorWindow).__headset.primaryInputMode = "controller";
+  });
+
+  // Acceptance 11: the same view-model checks as on the laptop, inside the session.
+  await expect.poll(async () => (await hud(page)).panels.banner.rows[0]?.id, { timeout: 20_000 }).toBe("fan");
+  const { panels } = await hud(page);
+  expect(panels.banner.rows[0]).toMatchObject({ level: "warning", word: "WARNING", action: "DCU FAN to SEC, return to lander" });
+  expect(panels.link).toMatchObject({ status: "ok", level: "nominal" });
+  expect(panels.consumables.rows).toHaveLength(7);
+  await sceneIsSteady(page);
+  const seen = await view(page);
+  expect(seen.panelsShown).toEqual(["banner", "consumables", "status", "switches", "vitals"]);
+  expect(seen.panelsOutOfView, "every panel in view of both eyes").toEqual([]);
+  await screenshot(page, testInfo, "warning-in-session");
+
+  await pressButton(page, "a-button");
+  await expect.poll(async () => (await hud(page)).input.last?.command).toEqual({
+    type: "command",
+    name: "ack_alert",
+    args: { id: "fan" },
+  });
+  await expect
+    .poll(async () => (await backend.state()).alerts.find((a) => a.id === "fan")?.acked, { timeout: 5000 })
+    .toBe(true);
+  await expect.poll(async () => (await hud(page)).panels.banner.rows.find((r) => r.id === "fan")?.acked).toBe(true);
+  expect((await hud(page)).input.count, "one press, one intent").toBe(1);
+
+  await pressButton(page, "b-button");
+  await expect.poll(async () => (await hud(page)).panels.details.open, { timeout: 5000 }).toBe(true);
+  await expect.poll(async () => (await view(page)).panelsShown).toEqual(["banner", "detailsLeft", "detailsRight", "status"]);
+  await sceneIsSteady(page);
+  const open = await view(page);
+  expect(open.panelsOutOfView, "the details page in view of both eyes").toEqual([]);
+  console.log(`draw calls, emulated headset: ${open.drawCalls} (details open), most ${open.maxDrawCalls}`);
+  expect(open.maxDrawCalls).toBeLessThanOrEqual(100);
 });

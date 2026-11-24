@@ -45,6 +45,8 @@ export function PanelAt({ name, children, fitHeight = false }: {
             height={fitHeight ? undefined : box.heightPx}
             maxHeight={box.heightPx}
             overflow="hidden"
+            // Text never wraps: a value split over two lines reads as two values.
+            wordBreak="keep-all"
             flexDirection="column"
             padding={panel.padding}
             gap={panel.rowGap}
