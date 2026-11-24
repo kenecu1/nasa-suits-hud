@@ -127,6 +127,10 @@ def test_an_unknown_scenario_names_the_known_ones():
     ("steps:\n  - at: -1\n    fault: fan\n", "at"),
     ("steps:\n  - at: 1\n    fault: gremlins\n", "fault"),
     ("steps:\n  - at: 1\n    set: {heart_rate: 3}\n", "bad path"),
+    ("steps:\n  - at: 1\n    set: {telemetry.hart_rate: 3}\n", "bad path"),
+    ("steps:\n  - at: 1\n    set: {telemetry: 3}\n", "names a section"),
+    ("steps:\n  - at: 1\n    set: {error.fan_error: true}\n", "use fault"),
+    ("steps:\n  - at: 1\n    set: {telemetry.fan_pri_rpm: 0}\n", "use fault"),
     ("- just a list", "mapping"),
     ("steps: [", "cannot read"),
 ])
@@ -190,7 +194,7 @@ def test_fan_failure_raises_a_fan_warning_that_clears_after_dcu_fan_to_sec():
             assert alert["action"] == "DCU FAN to SEC, return to lander"
             assert alert["acked"] is False
             assert msg["suit"]["values"]["fan_pri_rpm"]["level"] == "warning"
-            assert msg["alerts"][0]["id"] == "fan"  # the only alert, so on top
+            assert [a["id"] for a in msg["alerts"]] == ["fan"]  # one problem, one alert
 
             runtime.fake_tss.state["dcu"]["fan"] = False  # the wearer: DCU FAN to SEC
             msg = receive_until(ws, lambda m: fan_alert(m) is None, timeout=15)
@@ -205,11 +209,45 @@ def test_link_loss_shows_one_link_alert_and_every_value_stale_then_recovers():
     with TestClient(create_app(settings)) as client:
         client.app.state.runtime.sim.dynamics.set_fault("fan")  # a suit alert to suppress
         with client.websocket_connect("/ws") as ws:
-            receive_until(ws, lambda m: m["link"]["tss"] == "ok", timeout=5)
+            before = receive_until(ws, lambda m: fan_alert(m) is not None, timeout=8)
+            assert before["link"]["tss"] != "unreachable"
             lost = receive_until(ws, lambda m: m["link"]["tss"] == "unreachable", timeout=8)
-            back = receive_until(ws, lambda m: m["link"]["tss"] != "unreachable", timeout=10)
+            back = receive_until(ws, lambda m: fan_alert(m) is not None, timeout=12)
 
     assert [(a["id"], a["severity"]) for a in lost["alerts"]] == [("link", "warning")]
     assert lost["link"]["level"] == "warning"
     assert {v["level"] for v in lost["suit"]["values"].values()} == {"stale"}
-    assert all(a["id"] != "link" or a["severity"] != "warning" for a in back["alerts"])
+    # after the outage the fan alert is raised again, as a new unacknowledged alert
+    assert back["link"]["tss"] != "unreachable"
+    assert fan_alert(back)["acked"] is False
+    assert fan_alert(back)["since"] > fan_alert(before)["since"]
+
+
+def test_a_step_that_fails_is_not_retried_and_later_steps_still_run(monkeypatch):
+    driver = SimDriver(FakeTss(), load_scenario("link_loss"))
+    calls = []
+
+    def broken(step):
+        calls.append(step.at)
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(driver, "_apply", broken)
+    for _ in range(2):  # the step at 8 s, then the one at 16 s
+        with pytest.raises(RuntimeError):
+            driver.advance(10.0)
+    driver.advance(10.0)  # nothing left to retry: the rules just tick
+
+    assert calls == [8.0, 16.0]  # each step once
+    assert driver.finished
+
+
+async def test_the_driver_stops_after_ticks_keep_failing(monkeypatch):
+    driver = SimDriver(FakeTss())
+    monkeypatch.setattr(scenarios, "TICK_S", 0.001)
+
+    def broken(dt):
+        raise RuntimeError("dynamics bug")
+
+    monkeypatch.setattr(driver.dynamics, "tick", broken)
+    with pytest.raises(RuntimeError, match="dynamics bug"):
+        await driver.run()  # the task ends, so /health names it as dead

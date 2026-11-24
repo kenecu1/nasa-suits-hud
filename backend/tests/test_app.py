@@ -307,11 +307,37 @@ def test_settings_read_ports_and_extra_origins_from_the_environment():
     {"SUITS_ALLOWED_ORIGINS": "192.168.1.20:5173"},
     {"SUITS_MODE": "replay", "SUITS_RECORDING": "backend/tests/fixtures/captured-tss.jsonl",
      "SUITS_SCENARIO": "fan_failure"},
-    {"SUITS_SCENARIO_SPEED": "0"},
+    {"SUITS_SCENARIO": "fan_failure", "SUITS_SCENARIO_SPEED": "0"},
+    {"SUITS_SCENARIO_SPEED": "5"},  # without SUITS_SCENARIO
+    {"SUITS_ALLOWED_ORIGINS": "https://10.0.0.5:5173/hud"},  # a path never matches
 ])
 def test_bad_origin_and_scenario_settings_are_refused(env):
     with pytest.raises(SettingsError):
         Settings.from_env(env)
+
+
+def test_allowed_origins_are_compared_in_lower_case_like_browsers_send_them():
+    settings = Settings.from_env({"SUITS_ALLOWED_ORIGINS": "HTTPS://Quest.Local:5173"})
+
+    assert "https://quest.local:5173" in settings.allowed_origins()
+
+
+def test_a_command_that_fails_inside_is_logged_and_the_socket_stays_open(client, monkeypatch,
+                                                                        caplog):
+    from suits.core import commands
+
+    def broken(text, store):
+        raise RuntimeError("bug in a handler")
+
+    monkeypatch.setattr(commands, "handle", broken)
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        ws.send_json({"type": "command", "name": "toggle_details", "args": {}})
+        msg = ws.receive_json()  # states keep coming
+        msg = ws.receive_json()
+
+    assert msg["type"] == "state"
+    assert "command failed" in caplog.text
 
 
 def test_ack_alert_over_the_socket_marks_the_alert_in_the_next_state(client):

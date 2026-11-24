@@ -34,11 +34,15 @@ def _port(env: Mapping[str, str], name: str, default: int) -> int:
 
 def _origins(raw: str) -> tuple[str, ...]:
     """SUITS_ALLOWED_ORIGINS: comma-separated, e.g. "https://192.168.1.20:5173"."""
-    origins = tuple(o.strip().rstrip("/") for o in raw.split(",") if o.strip())
-    bad = [o for o in origins if not o.startswith(("http://", "https://"))]
+    # Browsers send scheme://host[:port] in lower case, with no path.
+    origins = tuple(o.strip().rstrip("/").lower() for o in raw.split(",") if o.strip())
+    bad = [
+        o for o in origins
+        if not o.startswith(("http://", "https://")) or "/" in o.split("://", 1)[1]
+    ]
     if bad:
-        raise SettingsError(f"SUITS_ALLOWED_ORIGINS entries must start with http:// or https://, "
-                            f"got {', '.join(bad)}")
+        raise SettingsError("SUITS_ALLOWED_ORIGINS entries must be http(s)://host[:port] with "
+                            f"no path, got {', '.join(bad)}")
     return origins
 
 
@@ -91,6 +95,8 @@ class Settings:
         scenario = env.get("SUITS_SCENARIO") or None
         if scenario is not None and mode != Mode.SIM:
             raise SettingsError("SUITS_SCENARIO plays on the built-in fake TSS: sim mode only")
+        if scenario is None and env.get("SUITS_SCENARIO_SPEED"):
+            raise SettingsError("SUITS_SCENARIO_SPEED needs SUITS_SCENARIO")
         try:
             scenario_speed = float(env.get("SUITS_SCENARIO_SPEED") or "1")
         except ValueError:

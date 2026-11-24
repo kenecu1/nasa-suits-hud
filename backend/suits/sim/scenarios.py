@@ -11,6 +11,8 @@ Step keys (one or more per step):
     fault: fan               turn a fault on (fan, oxy, scrubber, power)
     clear: fan               turn it off
     set: {telemetry.heart_rate: 152, status.started: false, dcu.fan: false}
+                             paths that exist in the fake's state; not error.* or the fan rpms,
+                             which the fault rules own (use fault: instead)
     link: lost | back        the fake stops answering and pushing, or starts again
 """
 
@@ -27,12 +29,15 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from suits.paths import DATA_DIR
 from suits.sim.dynamics import Dynamics, FaultName
-from suits.sim.fake_tss import FakeTss
+from suits.sim.fake_tss import FakeTss, default_state
 
 log = logging.getLogger(__name__)
 
 SCENARIOS_DIR = DATA_DIR / "scenarios"
 TICK_S = 0.1  # real seconds between dynamics updates
+FAILED_TICKS_LIMIT = 3  # ticks in a row that fail before the driver stops (and /health says so)
+# Set by dynamics.py on every tick: a scenario setting them would be undone at once.
+OWNED_BY_RULES = ("error.", "telemetry.fan_pri_rpm", "telemetry.fan_sec_rpm")
 
 
 class ScenarioError(ValueError):
@@ -103,9 +108,18 @@ def load_scenario(name: str, path: Path | None = None) -> Scenario:
 
 
 def _check_path(path: Path, index: int, key: str) -> None:
-    parts = key.split(".")
-    if len(parts) < 2 or parts[0] not in ("telemetry", "status", "dcu", "uia", "error", "imu"):
-        raise ScenarioError(f"{path}: steps.{index}.set: bad path {key!r}")
+    """The path must name a value that exists in the fake's state (a typo would otherwise
+    add a key nobody reads) and that the fault rules do not overwrite."""
+    where = f"{path}: steps.{index}.set: {key!r}"
+    if key.startswith(OWNED_BY_RULES):
+        raise ScenarioError(f"{where} is set by the fault rules; use fault: instead")
+    target: Any = default_state()
+    for part in key.split("."):
+        if not isinstance(target, dict) or part not in target:
+            raise ScenarioError(f"{where}: bad path, no such value in the fake TSS")
+        target = target[part]
+    if isinstance(target, dict):
+        raise ScenarioError(f"{where}: bad path, names a section, not a value")
 
 
 class SimDriver:
@@ -131,8 +145,9 @@ class SimDriver:
         """Move scenario time on by ``dt_s``: apply due steps, then run the rules."""
         self.elapsed_s += dt_s
         while not self.finished and self._steps[self._next].at <= self.elapsed_s:
-            self._apply(self._steps[self._next])
-            self._next += 1
+            step = self._steps[self._next]
+            self._next += 1  # first: a step that fails is not retried every tick
+            self._apply(step)
         self.dynamics.tick(dt_s)
 
     def _apply(self, step: Step) -> None:
@@ -147,19 +162,25 @@ class SimDriver:
             target = self.fake.state
             *parents, leaf = key.split(".")
             for part in parents:
-                target = target.setdefault(part, {})
+                target = target[part]  # checked at load: the path exists
             target[leaf] = value
         if step.link is not None:
             self.fake.silent = step.link == "lost"
 
     async def run(self) -> None:
-        """Run until cancelled. One bad tick is logged, never the end of the loop."""
+        """Run until cancelled. One bad tick is logged; FAILED_TICKS_LIMIT in a row end the
+        task, so /health names it as dead instead of the sim silently freezing."""
         last = time.monotonic()
+        failures = 0
         while True:
             await asyncio.sleep(TICK_S)
             now = time.monotonic()
             try:
                 self.advance((now - last) * self.speed)
+                failures = 0
             except Exception:
-                log.exception("sim dynamics tick failed")
+                failures += 1
+                if failures >= FAILED_TICKS_LIMIT:
+                    raise
+                log.exception("sim dynamics tick failed (%d in a row)", failures)
             last = now

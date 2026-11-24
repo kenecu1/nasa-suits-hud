@@ -32,5 +32,7 @@ process.on("SIGTERM", stopAll);
 start("backend", venvPython(), [
   "-m", "uvicorn", "--factory", "suits.app:create_app",
   "--host", "0.0.0.0", "--port", process.env.SUITS_PORT ?? "8000",
+  // A command is under 100 bytes; refuse big frames before they are read (default 16 MiB).
+  "--ws-max-size", "65536",
 ]);
 start("client", "npm", ["run", "dev", "--workspace", "client", "--if-present"]);
