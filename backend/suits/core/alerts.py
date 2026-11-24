@@ -8,7 +8,12 @@ the old one. Nothing here reads a clock, a socket or a file after loading the ru
 drive it one sample at a time.
 
 * One sample is one new telemetry arrival (decision C). Calling ``step`` twice with the same
-  arrival counts it once, so the publisher may build a State as often as it likes.
+  arrival counts it once, so the publisher may build a State as often as it likes. Arrivals
+  that came between two steps all count (an unchanged reply wakes nobody, so the publisher
+  may see several at its next heartbeat; their values were the same as the newest).
+* A sample in which some input is unknown (no number, or a switch-selected value while the
+  DCU position is unknown) can raise an alert from the inputs that are known, but can never
+  count toward clearing one: "nominal" needs every input known.
 * A problem rule's values raise an alert after ``RAISE_AFTER`` samples off nominal and clear
   it after ``CLEAR_AFTER`` nominal samples. Its fault flag raises a warning at once and clears
   on the first all-clear. Severity is the worst of its inputs.
@@ -20,10 +25,10 @@ drive it one sample at a time.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, NamedTuple, get_args
+from typing import Any, Literal, NamedTuple, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -155,7 +160,7 @@ def _label(name: str) -> str:
     return name.replace("_", " ").upper()
 
 
-def load_rules(ranges: dict, path: Path | None = None) -> Rules:
+def load_rules(ranges: dict[str, Any], path: Path | None = None) -> Rules:
     """Read and check data/alerts.json against the ranges (from levels.load_ranges)."""
     path = path or ALERTS_FILE
     try:
@@ -175,11 +180,15 @@ def load_rules(ranges: dict, path: Path | None = None) -> Rules:
         raise AlertsError(f"{path}: {problems}") from exc
 
     ranged = ranges["ranges"]
-    claimed: set[str] = set()
+    claimed: dict[str, str] = {}  # value name -> the rule that watches it
     for rule in parsed.rules:
         for value in rule.values:
             _check_value(path, rule.id, value, ranged)
-            claimed.update(value.names())
+            for name in value.names():
+                if name in claimed:
+                    raise AlertsError(f"{path}: {name} is in rules {claimed[name]} and {rule.id}: "
+                                      "one value belongs to one problem")
+                claimed[name] = rule.id
     generic = tuple(
         LevelRule(
             id=f"{GENERIC_PREFIX}{name}",
@@ -272,19 +281,21 @@ class Watched(NamedTuple):
 def step(book: AlertBook, inputs: AlertInputs, rules: Rules) -> AlertBook:
     lost = inputs.link == LinkStatus.UNREACHABLE
     suit_on = not lost and inputs.eva_started is not False
-    new_sample = (
-        inputs.telemetry_arrival is not None and inputs.telemetry_arrival != book.telemetry_seen
-    )
+    samples = _new_samples(book.telemetry_seen, inputs.telemetry_arrival)
 
     wanted: dict[str, tuple[Severity, str, str]] = {}
     tracks: dict[str, Track] = {}
     for rule in rules.problems:
-        watched = _watched(rule, inputs)
+        watched, complete = _watched(rule, inputs)
         track = book.tracks.get(rule.id, Track())
         if not suit_on or any(w.level == Level.STALE for w in watched):
             track = Track()  # old data raises and holds nothing
-        elif new_sample:
-            track = _advance(track, _worst(w.level for w in watched))
+        else:
+            worst = _worst(w.level for w in watched)
+            if worst == Level.NOMINAL and not complete:
+                worst = None  # an unwatched input may be the bad one: no all-clear
+            for _ in range(samples):
+                track = _advance(track, worst)
         if track != Track():
             tracks[rule.id] = track
         fault = (
@@ -295,7 +306,10 @@ def step(book: AlertBook, inputs: AlertInputs, rules: Rules) -> AlertBook:
         )
         severity = _worse(track.raised, Severity.WARNING if fault else None)
         if severity is not None:
-            title = _value_title(watched) if track.raised else f"{rule.label} FAULT"
+            title = f"{rule.label} FAULT"
+            if track.raised:
+                old = book.active.get(rule.id)
+                title = _value_title(watched) or (old.title if old else rule.label)
             wanted[rule.id] = (severity, title, rule.action)
 
     link = _link_text(inputs, rules)
@@ -339,17 +353,29 @@ def ack(book: AlertBook, alert_id: str | None = None) -> tuple[AlertBook, str | 
 # ---- helpers ----
 
 
-def _watched(rule: LevelRule, inputs: AlertInputs) -> list[Watched]:
-    """Each input this rule watches now.
+def _new_samples(seen: int | None, arrival: int | None) -> int:
+    """How many telemetry arrivals this step has not counted yet (at most CLEAR_AFTER, which
+    is enough to move any count to its end)."""
+    if arrival is None or arrival == seen:
+        return 0
+    if seen is None or arrival < seen:  # first arrival, or a new source
+        return 1
+    return min(arrival - seen, CLEAR_AFTER)
+
+
+def _watched(rule: LevelRule, inputs: AlertInputs) -> tuple[list[Watched], bool]:
+    """Each input this rule watches now, and whether every input could be watched.
 
     A switch-selected value is watched only when the switch position is known.
     """
     out = []
+    complete = True
     for item in rule.values:
         if item.switch is None:
             name, label = item.value, item.label
         else:
             if inputs.dcu is None:
+                complete = False
                 continue
             position = getattr(inputs.dcu, item.switch)
             name = (item.by_position or {})[position]
@@ -360,10 +386,11 @@ def _watched(rule: LevelRule, inputs: AlertInputs) -> list[Watched]:
             out.append(Watched(name, label, Level.UNKNOWN, None, ""))
         else:
             out.append(Watched(name, label, value.level, value.value, value.unit))
-    return out
+    complete = complete and all(w.level != Level.UNKNOWN for w in out)
+    return out, complete
 
 
-def _worst(levels) -> Level | None:
+def _worst(levels: Iterable[Level]) -> Level | None:
     """The worst known level, or None if nothing is known (unknown values say nothing)."""
     known = [lv for lv in levels if lv in (Level.NOMINAL, Level.CAUTION, Level.WARNING)]
     if not known:
@@ -408,11 +435,18 @@ def _worse(a: Severity | None, b: Severity | None) -> Severity | None:
 _LEVEL_ORDER = {Level.WARNING: 0, Level.CAUTION: 1, Level.NOMINAL: 2}
 
 
-def _value_title(watched: list[Watched]) -> str:
-    """'<label> <value> <unit>' of the worst input now, e.g. 'FAN PRI 21500 rpm'."""
-    known = [w for w in watched if w.level in _LEVEL_ORDER and w.value is not None]
+def _value_title(watched: list[Watched]) -> str | None:
+    """'<label> <value> <unit>' of the worst input now, e.g. 'FAN PRI 21500 rpm'.
+
+    None when no input is off nominal now (recovering, or the bad one is not watched): the
+    caller keeps the last title, so it never names a healthy value as the problem.
+    """
+    known = [
+        w for w in watched
+        if w.level in (Level.CAUTION, Level.WARNING) and w.value is not None
+    ]
     if not known:
-        return watched[0].label if watched else "?"
+        return None
     worst = min(known, key=lambda w: _LEVEL_ORDER[w.level])
     return f"{worst.label} {_number(worst.value)} {worst.unit}".rstrip()
 

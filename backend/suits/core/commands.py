@@ -30,8 +30,10 @@ def parse(text: str) -> Command | None:
     try:
         return Command.model_validate_json(text)
     except ValidationError as exc:
+        # repr() of each location part: an unknown key is the sender's text, and must not
+        # forge a log line with a newline in it
         problems = "; ".join(
-            f"{'.'.join(str(part) for part in e['loc']) or 'message'}: {e['msg']}"
+            f"{'.'.join(repr(part) for part in e['loc']) or 'message'}: {e['type']}"
             for e in exc.errors()
         )
         log.warning("dropped an invalid command message (%s): %.200r", problems, text)
