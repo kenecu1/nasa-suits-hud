@@ -54,6 +54,9 @@ class Level(StrEnum):
     WARNING = "warning"
     UNKNOWN = "unknown"  # no value, or not a number
     STALE = "stale"  # last value is older than STALE_AFTER_S["telemetry"]
+    # The device is switched off by the DCU (today only the fan the DCU FAN switch does not
+    # select). Its reading is real but expected to be out of range, so it is not an alarm.
+    OFF = "off"
 
 
 class Severity(StrEnum):

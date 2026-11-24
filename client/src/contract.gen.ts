@@ -8,7 +8,7 @@
  * via the `definition` "Severity".
  */
 export type Severity = "warning" | "caution";
-export type Level = "nominal" | "caution" | "warning" | "unknown" | "stale";
+export type Level = "nominal" | "caution" | "warning" | "unknown" | "stale" | "off";
 /**
  * This interface was referenced by `SuitsContract`'s JSON-Schema
  * via the `definition` "Mode".
@@ -28,7 +28,7 @@ export type LinkStatus = "unassigned" | "bad_data" | "unreachable" | "stale" | "
  * This interface was referenced by `SuitsContract`'s JSON-Schema
  * via the `definition` "Level".
  */
-export type Level1 = "nominal" | "caution" | "warning" | "unknown" | "stale";
+export type Level1 = "nominal" | "caution" | "warning" | "unknown" | "stale" | "off";
 
 /**
  * Contract v2. Generated from backend/suits/contract.py.

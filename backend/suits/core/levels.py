@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from suits.contract import DcuPositions
 from suits.paths import DATA_DIR
 
 RANGES_FILE = DATA_DIR / "ranges.json"
@@ -22,11 +23,30 @@ class _Entry(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True, allow_inf_nan=False)
 
 
+DcuSwitch = Literal["batt", "oxy", "comm", "fan", "pump", "co2"]
+
+
+class ActiveWhen(_Entry):
+    """The value belongs to a device that runs only while this DCU switch is at ``position``.
+    Otherwise store.py gives it level "off" (only the active fan spins)."""
+
+    dcu: DcuSwitch
+    position: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _position_exists(self) -> ActiveWhen:
+        positions = get_args(DcuPositions.model_fields[self.dcu].annotation)
+        if self.position not in positions:
+            raise ValueError(f"DCU {self.dcu} has no position {self.position!r} ({positions})")
+        return self
+
+
 class RangedValue(_Entry):
     min: float
     max: float
     check: Literal["low", "high", "both"]
     unit: str = Field(min_length=1)
+    active_when: ActiveWhen | None = None
 
     @model_validator(mode="after")
     def _min_below_max(self) -> RangedValue:

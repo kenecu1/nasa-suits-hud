@@ -17,6 +17,7 @@ from typing import Any
 from suits.contract import (
     STALE_AFTER_S,
     Alert,
+    DcuPositions,
     Eva,
     Level,
     Link,
@@ -56,6 +57,8 @@ def suit_values(snapshot: TssSnapshot, ranges: dict[str, Any]) -> dict[str, Suit
     # silences them: unknown or stale status counts as started, so alarms stay on.
     started = not (snapshot.started is False and _fresh(snapshot, "status"))
     margin = ranges["caution_margin"]
+    # A switch position is only a fact while the DCU section is fresh. Unknown: no value is off.
+    dcu = snapshot.dcu if _fresh(snapshot, "dcu") else None
     values: dict[str, SuitValue] = {}
     for name, spec in {**ranges["ranges"], **ranges.get("unranged", {})}.items():
         value = snapshot.telemetry.get(name)
@@ -63,12 +66,24 @@ def suit_values(snapshot: TssSnapshot, ranges: dict[str, Any]) -> dict[str, Suit
             level = Level.UNKNOWN
         elif not fresh:
             level = Level.STALE
+        elif _switched_off(spec, dcu):
+            level = Level.OFF
         elif not started or "check" not in spec:
             level = Level.NOMINAL
         else:
             level = Level(classify(value, spec, margin))
         values[name] = SuitValue(value=value, unit=spec["unit"], level=level)
     return values
+
+
+def _switched_off(spec: dict[str, Any], dcu: DcuPositions | None) -> bool:
+    """True when ranges.json says the value's device runs only at another DCU position. Only
+    the active fan spins (docs/notes/tss-inactive-device-reads-off-range.md), so the other one
+    reads 0 rpm; that is "off", not a warning. Unknown DCU position: nothing is off."""
+    when = spec.get("active_when")
+    if dcu is None or when is None:
+        return False
+    return getattr(dcu, when["dcu"]) != when["position"]
 
 
 def build_state(

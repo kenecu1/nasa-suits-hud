@@ -1,6 +1,6 @@
 {
   "_source": "NASA TSS2027 documents/telemetry_ranges/eva-telemetry-ranges.pdf (min and max = normal range). Edges that matter come from the notes in that PDF. Units are from the same PDF.",
-  "_how_it_works": "warning = outside [min, max] on a checked edge. caution = inside the range but within caution_margin x (max - min) of a checked edge. check says which edges matter: low, high or both. Values in unranged have a unit but no level check.",
+  "_how_it_works": "warning = outside [min, max] on a checked edge. caution = inside the range but within caution_margin x (max - min) of a checked edge. check says which edges matter: low, high or both. Values in unranged have a unit but no level check. active_when names the DCU switch position at which the value's device runs; at any other position its level is off (only the active fan spins).",
   "caution_margin": 0.10,
   "ranges": {
     "primary_battery_level": {"min": 20,    "max": 100,   "check": "low",  "unit": "%"},
@@ -18,8 +18,8 @@
     "suit_pressure_other": {"min": 0.0,   "max": 0.5,   "check": "high", "unit": "psi"},
     "suit_pressure_total": {"min": 3.5,   "max": 4.5,   "check": "both", "unit": "psi"},
     "helmet_pressure_co2": {"min": 0.0,   "max": 0.15,  "check": "high", "unit": "psi"},
-    "fan_pri_rpm": {"min": 29000, "max": 31000, "check": "both", "unit": "rpm"},
-    "fan_sec_rpm": {"min": 29000, "max": 31000, "check": "both", "unit": "rpm"},
+    "fan_pri_rpm": {"min": 29000, "max": 31000, "check": "both", "unit": "rpm", "active_when": {"dcu": "fan", "position": "PRI"}},
+    "fan_sec_rpm": {"min": 29000, "max": 31000, "check": "both", "unit": "rpm", "active_when": {"dcu": "fan", "position": "SEC"}},
     "scrubber_a_co2_storage": {"min": 0,     "max": 60,    "check": "high", "unit": "%"},
     "scrubber_b_co2_storage": {"min": 0,     "max": 60,    "check": "high", "unit": "%"},
     "temperature": {"min": 10,    "max": 32,    "check": "both", "unit": "°C"},
