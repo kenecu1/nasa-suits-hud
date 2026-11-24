@@ -4,7 +4,7 @@ One lesson per file. The first line of each file is a one-line summary. Read thi
 
 Add a note when you learn something a later session would otherwise have to rediscover (a TSS quirk, a tool trap, a headset finding). Do not add status reports or summaries of finished work. Fix or delete a note when it turns out to be wrong.
 
-File name: `<area>-<short-lesson>.md`. Areas so far: `tss`, `py`, `quest`, `xr`, `e2e`.
+File name: `<area>-<short-lesson>.md`. Areas so far: `tss`, `py`, `quest`, `xr`, `e2e`, `ui`.
 
 ## Index
 
@@ -37,3 +37,9 @@ WebXR emulation and end-to-end tests (verified in M1, 2026-11-16)
 - [xr-dev-emulator-needs-one-three](xr-dev-emulator-needs-one-three.md) — the emulator control panel needs `resolve.dedupe: ["three"]`; the library's built-in emulator does not install in Chromium.
 - [xr-hud-lazy-follow](xr-hud-lazy-follow.md) — the HUD rig lags behind the head and turns only left/right; it is not head-locked.
 - [e2e-backend-link-settles-after-start](e2e-backend-link-settles-after-start.md) — the sim link takes about 3 s to reach `ok` after a backend start; tests wait for it.
+
+HUD client (verified in M2, 2026-11-24)
+- [e2e-dark-screenshots-pass-at-two-percent](e2e-dark-screenshots-pass-at-two-percent.md) — a whole new layout changes under 2% of the dark page's pixels; refresh baselines with `--update-snapshots=all` and look at them.
+- [xr-controller-buttons-without-profiles](xr-controller-buttons-without-profiles.md) — read `inputSources[].gamepad.buttons` (right A = 4, B = 5); @react-three/xr's controller state downloads a profile from a CDN.
+- [xr-panel-corners-project-wider](xr-panel-corners-project-wider.md) — check panel corners by projection into each eye; angles understate how far out they land.
+- [ui-uikit-text-wraps-by-default](ui-uikit-text-wraps-by-default.md) — `wordBreak="keep-all"` on each panel and `flexShrink={0}` on rows, or values wrap and rows overlap.
