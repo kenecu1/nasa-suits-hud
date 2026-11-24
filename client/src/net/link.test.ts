@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { State } from "../contract.gen";
+import type { Command, State } from "../contract.gen";
 import type { Conn } from "../hud/types";
 import { backoffMs, SILENCE_MS, startLink, type SocketLike } from "./link";
 
@@ -9,8 +9,15 @@ class FakeSocket implements SocketLike {
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
   closed = false;
+  sent: string[] = [];
+  failSend = false;
 
   constructor(readonly url: string) {}
+
+  send(data: string): void {
+    if (this.failSend) throw new Error("socket is closing");
+    this.sent.push(data);
+  }
 
   close(): void {
     this.closed = true;
@@ -344,5 +351,61 @@ describe("startLink", () => {
     link.stop();
     vi.advanceTimersByTime(60_000);
     expect(sockets).toHaveLength(1);
+  });
+});
+
+describe("send", () => {
+  const ack: Command = { type: "command", name: "ack_alert", args: { id: "fan" } };
+
+  it("sends a command as JSON once the link is live", () => {
+    const { sock, link } = setup();
+    sock(0).message(msg());
+    expect(link.send(ack)).toBe(true);
+    expect(sock(0).sent.map((d) => JSON.parse(d) as unknown)).toEqual([ack]);
+  });
+
+  it("drops a command before the first state, with a warning, and queues nothing", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { sock, link } = setup();
+    expect(link.send(ack)).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("dropped command ack_alert (link is connecting)"));
+    sock(0).message(msg());
+    expect(sock(0).sent).toEqual([]);
+    warn.mockRestore();
+  });
+
+  it("drops a command while offline, and sends on the new socket once live again", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { sock, link } = setup();
+    sock(0).message(msg());
+    sock(0).serverClose();
+    expect(link.send(ack)).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("(link is offline)"));
+    vi.advanceTimersByTime(backoffMs(0));
+    sock(1).message(msg(2));
+    expect(link.send(ack)).toBe(true);
+    expect(sock(0).sent).toEqual([]);
+    expect(sock(1).sent).toHaveLength(1);
+    warn.mockRestore();
+  });
+
+  it("reports a socket that throws on send as not sent", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { sock, link } = setup();
+    sock(0).message(msg());
+    sock(0).failSend = true;
+    expect(link.send(ack)).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("could not send command ack_alert"), expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it("drops a command after stop", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { sock, link } = setup();
+    sock(0).message(msg());
+    link.stop();
+    expect(link.send(ack)).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("(link is stopped)"));
+    warn.mockRestore();
   });
 });

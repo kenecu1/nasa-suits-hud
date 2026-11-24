@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { createIntentHandler, setIntentHandler, fireIntent } from "./input/dispatch";
+import { startKeyboard } from "./input/keyboard";
 import { wsUrl } from "./net/backendUrl";
 import { startLink } from "./net/link";
 import { useHud } from "./store";
@@ -14,6 +16,16 @@ const link = startLink({
   onState: (state) => useHud.getState().receive(state),
   onConn: (conn) => useHud.getState().setConn(conn),
 });
+
+// Every user action: intent -> command -> link. The backend's next State shows the result.
+setIntentHandler(
+  createIntentHandler({
+    send: (command) => link.send(command),
+    panels: () => useHud.getState().panels,
+    onRecord: (record) => useHud.getState().noteIntent(record),
+  }),
+);
+const stopKeyboard = startKeyboard(fireIntent);
 
 const container = document.getElementById("root");
 if (container === null) throw new Error("index.html has no #root element");
@@ -31,9 +43,11 @@ if (import.meta.env.DEV) {
     .catch((error: unknown) => console.error("The headset emulator did not start", error));
 }
 
-// Dev only: when this module is replaced, do not leave a second socket running.
+// Dev only: when this module is replaced, do not leave a second socket or listener running.
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
+    stopKeyboard();
+    setIntentHandler(null);
     link.stop();
     removeHook();
     root.unmount();

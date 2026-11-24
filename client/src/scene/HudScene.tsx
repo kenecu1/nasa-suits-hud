@@ -1,14 +1,21 @@
-// The one scene, drawn in three places: the laptop page (fixed camera, dark backdrop), the
-// emulated headset and the real headset (the camera is the head, the background is the world).
 import { Canvas, useThree } from "@react-three/fiber";
 import { useXR, XR } from "@react-three/xr";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Group } from "three";
+import { XrButtons } from "../input/XrButtons";
 import { SceneBoundary } from "../SceneBoundary";
+import { useHud } from "../store";
 import { theme } from "../theme";
+import { AlertBanner } from "./AlertBanner";
+import { ConsumablesPanel } from "./ConsumablesPanel";
+import { DetailsPage } from "./DetailsPage";
 import { HudRig } from "./HudRig";
+import { PanelRegistryContext, type PanelRegistry } from "./PanelAt";
 import { StatusPanel } from "./StatusPanel";
+import { SwitchPanel } from "./SwitchPanel";
+import { Tone } from "./Tone";
 import { ViewProbe } from "./ViewProbe";
+import { VitalsPanel } from "./VitalsPanel";
 import { xrStore } from "./xr";
 
 const { camera: cam } = theme;
@@ -17,28 +24,39 @@ const { camera: cam } = theme;
 function LaptopView() {
   const inSession = useXR((s) => s.session != null);
   const camera = useThree((s) => s.camera);
-
   useEffect(() => {
     if (inSession) return;
-    // Whatever a session did to the camera, the laptop view is always from the same fixed place.
     camera.position.set(0, cam.eyeHeightM, 0);
     camera.rotation.set(0, 0, 0);
     camera.updateMatrixWorld();
   }, [inSession, camera]);
-
   return inSession ? null : <color attach="background" args={[theme.color.backdrop]} />;
 }
 
 function Hud() {
   const rigRef = useRef<Group>(null);
-  const panelRef = useRef<Group>(null);
+  const [registry] = useState<PanelRegistry>(() => new Map());
+  // The details page takes the place of the vitals, switches and consumables (hud/layout.ts).
+  const detailsOpen = useHud((s) => s.panels.details.open);
   return (
-    <>
-      <HudRig rigRef={rigRef} panelRef={panelRef}>
+    <PanelRegistryContext.Provider value={registry}>
+      <HudRig rigRef={rigRef}>
+        <AlertBanner />
         <StatusPanel />
+        {detailsOpen ? (
+          <DetailsPage />
+        ) : (
+          <>
+            <VitalsPanel />
+            <SwitchPanel />
+            <ConsumablesPanel />
+          </>
+        )}
       </HudRig>
-      <ViewProbe rigRef={rigRef} panelRef={panelRef} />
-    </>
+      <ViewProbe rigRef={rigRef} registry={registry} />
+      <Tone />
+      <XrButtons />
+    </PanelRegistryContext.Provider>
   );
 }
 

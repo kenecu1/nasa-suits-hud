@@ -1,28 +1,41 @@
-// Measures what was really drawn, once per frame, for window.__hud.view: is the panel inside
-// the view of each eye, where the head and the rig point, and how many draw calls a frame took.
-// It reads the renderer's own cameras, so in a WebXR session it sees what the headset sees.
+// Measures what the renderer really draws, once a frame, into window.__hud.view: draw calls,
+// whether a WebXR session is presenting, and whether every panel shown is fully in view of
+// every eye. End-to-end tests read it, because nothing inside the HUD is in the DOM.
 import { useFrame, type RootState } from "@react-three/fiber";
 import { useXR } from "@react-three/xr";
 import { useRef, type RefObject } from "react";
 import { Vector3, type Camera, type Group } from "three";
+import { LAYOUT, type PanelName } from "../hud/layout";
 import type { HudView } from "../testHook";
 import { theme } from "../theme";
 import { RIG_PLACED } from "./HudRig";
+import type { PanelRegistry } from "./PanelAt";
 import { headYaw } from "./rigMath";
 
 const RAD_TO_DEG = 180 / Math.PI;
-const halfW = (theme.panel.width * theme.panel.pixelSize) / 2;
-const halfH = (theme.panel.height * theme.panel.pixelSize) / 2;
-const CORNERS = [
-  [-halfW, -halfH],
-  [halfW, -halfH],
-  [halfW, halfH],
-  [-halfW, halfH],
-] as const;
-
 const point = new Vector3();
+const corner = new Vector3();
 const direction = new Vector3();
 const laptopEye: Camera[] = [];
+
+/** The four corners of a panel, in metres, relative to its anchor point (PanelAt's group). */
+function cornersOf(name: PanelName): [number, number][] {
+  const box = LAYOUT[name];
+  const w = (box.widthPx * theme.panel.pixelSize) / 2;
+  const h = box.heightPx * theme.panel.pixelSize;
+  const [top, bottom] = box.anchor === "top" ? [0, -h] : [h / 2, -h / 2];
+  return [
+    [-w, bottom],
+    [w, bottom],
+    [w, top],
+    [-w, top],
+  ];
+}
+
+const CORNERS = Object.fromEntries((Object.keys(LAYOUT) as PanelName[]).map((n) => [n, cornersOf(n)])) as Record<
+  PanelName,
+  [number, number][]
+>;
 
 /** True when a world point lies inside what this camera draws. */
 function sees(eye: Camera, world: Vector3): boolean {
@@ -30,33 +43,28 @@ function sees(eye: Camera, world: Vector3): boolean {
   return Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1 && Math.abs(point.z) <= 1;
 }
 
-export function ViewProbe({ rigRef, panelRef }: {
-  rigRef: RefObject<Group | null>;
-  panelRef: RefObject<Group | null>;
-}) {
+export function ViewProbe({ rigRef, registry }: { rigRef: RefObject<Group | null>; registry: PanelRegistry }) {
   const xrMode = useXR((s) => s.mode);
-  const corner = useRef(new Vector3());
   const view = useRef<HudView>({
     frames: 0,
     drawCalls: 0,
     maxDrawCalls: 0,
     presenting: false,
     xrMode: null,
+    panelsShown: [],
     panelInView: false,
+    panelsOutOfView: [],
     framesOutOfView: 0,
     headYawDeg: 0,
     rigYawDeg: 0,
   });
-
   const broken = useRef(false);
 
-  // This runs before the frame is drawn, so the numbers describe the frame before it.
   useFrame((frame) => {
     if (broken.current) return;
     try {
       measure(frame);
     } catch (error) {
-      // Measuring is for tests. It must never stop the frame loop that draws the HUD.
       broken.current = true;
       console.error("The view probe stopped", error);
     }
@@ -64,21 +72,23 @@ export function ViewProbe({ rigRef, panelRef }: {
 
   function measure({ gl, camera }: RootState): void {
     const rig = rigRef.current;
-    const panel = panelRef.current;
-    if (rig === null || panel === null || rig.userData[RIG_PLACED] !== true) return;
-
+    if (rig === null || rig.userData[RIG_PLACED] !== true) return;
     const v = view.current;
     const presenting = gl.xr.isPresenting;
     laptopEye[0] = camera;
     const eyes: readonly Camera[] = presenting ? gl.xr.getCamera().cameras : laptopEye;
 
-    panel.updateWorldMatrix(true, false);
-    let inView = eyes.length > 0;
-    // Plain index loops: this runs every frame and should not allocate.
-    for (let c = 0; c < CORNERS.length; c++) {
-      const [x, y] = CORNERS[c] as (typeof CORNERS)[number];
-      corner.current.set(x, y, 0).applyMatrix4(panel.matrixWorld);
-      for (let e = 0; e < eyes.length; e++) inView &&= sees(eyes[e] as Camera, corner.current);
+    const shown: PanelName[] = [];
+    const outOfView: PanelName[] = [];
+    for (const [name, group] of registry) {
+      shown.push(name);
+      group.updateWorldMatrix(true, false);
+      let inView = eyes.length > 0;
+      for (const [x, y] of CORNERS[name]) {
+        corner.set(x, y, 0).applyMatrix4(group.matrixWorld);
+        for (let e = 0; e < eyes.length; e++) inView &&= sees(eyes[e] as Camera, corner);
+      }
+      if (!inView) outOfView.push(name);
     }
 
     camera.getWorldDirection(direction);
@@ -87,8 +97,10 @@ export function ViewProbe({ rigRef, panelRef }: {
     v.maxDrawCalls = Math.max(v.maxDrawCalls, v.drawCalls);
     v.presenting = presenting;
     v.xrMode = xrMode;
-    v.panelInView = inView;
-    if (!inView) v.framesOutOfView += 1;
+    v.panelsShown = shown.sort();
+    v.panelsOutOfView = outOfView.sort();
+    v.panelInView = shown.length > 0 && outOfView.length === 0;
+    if (!v.panelInView) v.framesOutOfView += 1;
     v.headYawDeg = headYaw(direction.x, direction.z, v.headYawDeg / RAD_TO_DEG) * RAD_TO_DEG;
     v.rigYawDeg = rig.rotation.y * RAD_TO_DEG;
     if (window.__hud) window.__hud.view = v;

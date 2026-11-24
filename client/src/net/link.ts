@@ -7,7 +7,7 @@
 // The backend sends a state every second. If nothing understandable arrives for SILENCE_MS the
 // link is reported offline, whatever the socket claims, and the socket is replaced. That covers
 // a backend that is up but cannot build a state, a half-open connection, and a version mismatch.
-import type { State } from "../contract.gen";
+import type { Command, State } from "../contract.gen";
 import type { Conn } from "../hud/types";
 import { parseState } from "./parse";
 
@@ -16,7 +16,18 @@ export interface SocketLike {
   onmessage: ((event: { data: unknown }) => void) | null;
   onclose: (() => void) | null;
   onerror: (() => void) | null;
+  send(data: string): void;
   close(): void;
+}
+
+export interface Link {
+  /**
+   * Send a command now, or drop it with a warning in the console when the link is not live:
+   * there is no queue, because an old command (an ack for an alert that has since changed)
+   * must not arrive late. Returns whether it was handed to the socket.
+   */
+  send(command: Command): boolean;
+  stop(): void;
 }
 
 export interface LinkOptions {
@@ -42,7 +53,7 @@ function browserSocket(url: string): SocketLike {
   return new WebSocket(url) as unknown as SocketLike;
 }
 
-export function startLink(options: LinkOptions): { stop(): void } {
+export function startLink(options: LinkOptions): Link {
   const makeSocket = options.makeSocket ?? browserSocket;
   let socket: SocketLike | null = null;
   let conn: Conn = "connecting";
@@ -148,6 +159,19 @@ export function startLink(options: LinkOptions): { stop(): void } {
   connect();
 
   return {
+    send(command: Command): boolean {
+      if (stopped || socket === null || conn !== "live") {
+        console.warn(`backend link: dropped command ${command.name} (link is ${stopped ? "stopped" : conn})`);
+        return false;
+      }
+      try {
+        socket.send(JSON.stringify(command));
+        return true;
+      } catch (error) {
+        console.warn(`backend link: could not send command ${command.name}`, error);
+        return false;
+      }
+    },
     stop(): void {
       stopped = true;
       clearTimeout(silenceTimer);
